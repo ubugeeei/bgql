@@ -1550,9 +1550,91 @@ input CreateUserInput {
 }
 ```
 
-### 8.2 Input Union (Better GraphQL Exclusive Feature)
+### 8.2 Input Enum (Better GraphQL Exclusive Feature)
 
-Better GraphQL supports Input Union, which is not available in GraphQL.
+Better GraphQL supports Input Enum, allowing enum variants to carry input data. This is more expressive than input unions and follows Rust-style enum semantics.
+
+```graphql
+# Input enum with variant data
+input enum LoginMethod {
+  Email { email: String, password: String }
+  OAuth { provider: OAuthProvider, token: String }
+  Phone { phoneNumber: String, verificationCode: String }
+  Passkey { credentialId: String, authenticatorData: String }
+}
+
+type Mutation {
+  login(method: LoginMethod): AuthResult
+}
+```
+
+#### Input Enum vs Input Union
+
+Input enum is preferred over input union for:
+- **Discriminated unions**: When you need to distinguish variants by a tag
+- **Variant-specific data**: When each variant has different fields
+- **Type safety**: Compile-time exhaustiveness checking
+
+```graphql
+# Input enum (preferred)
+input enum PaymentMethod {
+  Card { cardNumber: String, cvv: String, expiry: String }
+  BankTransfer { accountNumber: String, routingNumber: String }
+  Crypto { walletAddress: String, network: CryptoNetwork }
+}
+
+# vs Input union (legacy approach)
+input CardPayment { cardNumber: String, cvv: String, expiry: String }
+input BankPayment { accountNumber: String, routingNumber: String }
+input CryptoPayment { walletAddress: String, network: CryptoNetwork }
+input union PaymentMethodLegacy = CardPayment | BankPayment | CryptoPayment
+```
+
+#### Input Enum Serialization
+
+```json
+{
+  "method": {
+    "__variant": "Email",
+    "email": "user@example.com",
+    "password": "secret"
+  }
+}
+```
+
+Alternative serialization with external tagging:
+
+```json
+{
+  "method": {
+    "Email": {
+      "email": "user@example.com",
+      "password": "secret"
+    }
+  }
+}
+```
+
+#### Unit Variants
+
+Input enums can have unit variants (no data):
+
+```graphql
+input enum SortOrder {
+  Ascending
+  Descending
+  Random { seed: Option<Int> }
+}
+```
+
+```json
+{ "order": { "__variant": "Ascending" } }
+{ "order": { "__variant": "Random", "seed": 42 } }
+```
+
+### 8.3 Input Union (Legacy)
+
+Input unions are still supported for backwards compatibility, but input enums are preferred.
 
 ```graphql
 input EmailCredentials {
@@ -1589,7 +1671,7 @@ type Mutation {
 }
 ```
 
-### 8.3 Patch Modifier
+### 8.4 Patch Modifier
 
 Generates an input type for partial updates.
 

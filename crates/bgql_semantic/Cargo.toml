@@ -1,0 +1,19 @@
+[package]
+name = "bgql_semantic"
+description = "Semantic analysis for Better GraphQL (HIR, types, type checker)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bgql_core.workspace = true
+bgql_syntax.workspace = true
+rustc-hash.workspace = true
+indexmap.workspace = true
+
+[dev-dependencies]
+
+[features]
+default = []

@@ -338,77 +338,313 @@ const server = createServer({
 server.listen({ port: 4000 });
 ```
 
-## 7. DataLoader Implementation
+## 7. DataLoader Library
+
+The bgql Server SDK provides a built-in DataLoader library for automatic N+1 query prevention. Unlike external DataLoader libraries, bgql's implementation is:
+
+- **Schema-aware** - Loader types are generated from your schema
+- **Argument-aware** - Supports field arguments (e.g., `first`, `filter`)
+- **Zero-configuration** - Automatic batching and caching per request
+
+### 7.1 Core Concepts
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  GraphQL Request                                             │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │  query {                                                ││
+│  │    users(first: 3) {      ← 3 users returned            ││
+│  │      id                                                 ││
+│  │      posts(first: 5) {    ← Would be 3 queries (N+1)    ││
+│  │        title                                            ││
+│  │      }                                                  ││
+│  │    }                                                    ││
+│  │  }                                                      ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  DataLoader Batching (same event loop tick)                 │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │  load(userId1, { first: 5 })  ─┐                        ││
+│  │  load(userId2, { first: 5 })  ─┼─► Single batch call    ││
+│  │  load(userId3, { first: 5 })  ─┘                        ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Database Query (1 query instead of N)                      │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │  SELECT * FROM posts                                    ││
+│  │  WHERE author_id IN ($1, $2, $3)                        ││
+│  │  LIMIT 5                                                ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 7.2 Library API
+
+```typescript
+import {
+  createDataLoader,
+  defineLoaders,
+  type DataLoader,
+  type BatchLoadFn,
+} from '@bgql/server'
+
+// DataLoader type signature
+interface DataLoader<K, V, A = void> {
+  // Load a single value (batched automatically)
+  load(key: K, args?: A): Promise<V>
+
+  // Load multiple values
+  loadMany(keys: K[], args?: A): Promise<Map<K, V>>
+
+  // Clear cached value for key
+  clear(key: K): void
+
+  // Clear all cached values
+  clearAll(): void
+
+  // Prime the cache with a value
+  prime(key: K, value: V): void
+}
+
+// Batch function type
+type BatchLoadFn<K, V, A = void> = (
+  keys: K[],
+  args: A
+) => Promise<Map<K, V>>
+```
+
+### 7.3 Defining Loaders
 
 > **Note**: The examples below use Prisma, but you can use any ORM or query builder you prefer (Drizzle, Kysely, TypeORM, raw SQL, etc.).
 
 ```typescript
 // src/loaders.ts
-import type { LoaderImplementations } from "./generated/loaders";
-import type { PrismaClient } from "@prisma/client";
+import { defineLoaders } from '@bgql/server'
+import type { LoaderDefinitions } from './generated/loaders'
+import type { PrismaClient } from '@prisma/client'
 
-export function createLoaders(prisma: PrismaClient): LoaderImplementations {
-  return {
-    // Called once with all userIds collected in the batch window
-    userPosts: async (userIds, args) => {
+export function createLoaders(prisma: PrismaClient): LoaderDefinitions {
+  return defineLoaders({
+    // Simple key-value loader (no args)
+    user: async (ids: UserId[]) => {
+      const users = await prisma.user.findMany({
+        where: { id: { in: ids.map(id => id.value) } },
+      })
+      return new Map(users.map(u => [UserId(u.id), u]))
+    },
+
+    // Loader with field arguments
+    userPosts: async (userIds: UserId[], args: { first?: number }) => {
       const posts = await prisma.post.findMany({
-        where: {
-          authorId: { in: userIds.map(id => id.value) },
-        },
-        orderBy: { createdAt: "desc" },
+        where: { authorId: { in: userIds.map(id => id.value) } },
+        orderBy: { createdAt: 'desc' },
         take: args.first ?? 10,
-      });
+      })
 
       // Group by authorId
-      const grouped = new Map<string, Post[]>();
+      const grouped = new Map<string, Post[]>()
       for (const post of posts) {
-        const list = grouped.get(post.authorId) ?? [];
-        list.push(post);
-        grouped.set(post.authorId, list);
+        const list = grouped.get(post.authorId) ?? []
+        list.push(post)
+        grouped.set(post.authorId, list)
       }
 
-      return new Map(userIds.map(id => [id, grouped.get(id.value) ?? []]));
+      return new Map(userIds.map(id => [id, grouped.get(id.value) ?? []]))
     },
 
-    userPostsCount: async (userIds) => {
+    // Aggregation loader
+    userPostsCount: async (userIds: UserId[]) => {
       const counts = await prisma.post.groupBy({
-        by: ["authorId"],
-        where: {
-          authorId: { in: userIds.map(id => id.value) },
-        },
+        by: ['authorId'],
+        where: { authorId: { in: userIds.map(id => id.value) } },
         _count: { id: true },
-      });
+      })
 
-      const countMap = new Map(counts.map(r => [r.authorId, r._count.id]));
-      return new Map(userIds.map(id => [id, countMap.get(id.value) ?? 0]));
+      const countMap = new Map(counts.map(r => [r.authorId, r._count.id]))
+      return new Map(userIds.map(id => [id, countMap.get(id.value) ?? 0]))
     },
-  };
+
+    // One-to-one relation loader
+    userProfile: async (userIds: UserId[]) => {
+      const profiles = await prisma.profile.findMany({
+        where: { userId: { in: userIds.map(id => id.value) } },
+      })
+
+      const profileMap = new Map(profiles.map(p => [p.userId, p]))
+      return new Map(userIds.map(id => [id, profileMap.get(id.value) ?? null]))
+    },
+  })
 }
+```
 
-// Loaders are automatically injected and managed by the SDK
-// No need to manually create DataLoader instances
+### 7.4 Using Loaders in Resolvers
 
-// In resolvers, field batching happens automatically
+```typescript
+// src/resolvers.ts
+import type { Resolvers } from './generated/resolvers'
+
+const resolvers: Resolvers<AppContext> = {
+  Query: {
+    user: async (_, { id }, ctx) => {
+      // Single load - batched with other loads in same tick
+      const user = await ctx.loaders.user.load(id)
+      if (!user) {
+        return { __typename: 'NotFoundError', ... }
+      }
+      return user
+    },
+
+    users: async (_, { first }, ctx) => {
+      return ctx.db.user.findMany({ take: first })
+    },
+  },
+
+  User: {
+    // Field resolver - automatically batched across all User instances
+    posts: async (parent, args, ctx) => {
+      // Even though this is called for each user,
+      // the loader batches all calls into a single DB query
+      return ctx.loaders.userPosts.load(parent.id, args)
+    },
+
+    postsCount: async (parent, _, ctx) => {
+      return ctx.loaders.userPostsCount.load(parent.id)
+    },
+
+    profile: async (parent, _, ctx) => {
+      return ctx.loaders.userProfile.load(parent.id)
+    },
+  },
+}
+```
+
+### 7.5 Advanced Patterns
+
+#### Cache Priming
+
+```typescript
 const resolvers: Resolvers = {
   Query: {
     users: async (_, { first }, ctx) => {
-      return ctx.prisma.user.findMany({ take: first });
-    },
-  },
+      const users = await ctx.db.user.findMany({ take: first })
 
-  // Field resolvers are automatically batched
-  User: {
-    // SDK collects all User.posts requests and calls loader once
-    posts: async (user, args, ctx) => {
-      // This looks like it would cause N+1, but SDK batches automatically
-      return ctx.prisma.post.findMany({
-        where: { authorId: user.id.value },
-        take: args.first ?? 10,
-      });
+      // Prime the cache so subsequent user(id) calls are instant
+      for (const user of users) {
+        ctx.loaders.user.prime(UserId(user.id), user)
+      }
+
+      return users
     },
   },
-};
+}
 ```
+
+#### Cache Invalidation
+
+```typescript
+const resolvers: Resolvers = {
+  Mutation: {
+    updateUser: async (_, { input }, ctx) => {
+      const user = await ctx.db.user.update({
+        where: { id: input.id.value },
+        data: input,
+      })
+
+      // Clear stale cache entry
+      ctx.loaders.user.clear(input.id)
+
+      // Or prime with new value
+      ctx.loaders.user.prime(input.id, user)
+
+      return user
+    },
+  },
+}
+```
+
+#### Conditional Loading
+
+```typescript
+const resolvers: Resolvers = {
+  User: {
+    // Only load if field is requested
+    posts: async (parent, args, ctx, info) => {
+      // Check if subfields actually need the data
+      const requestedFields = getRequestedFields(info)
+
+      if (requestedFields.length === 0) {
+        return []
+      }
+
+      return ctx.loaders.userPosts.load(parent.id, args)
+    },
+  },
+}
+```
+
+### 7.6 Generated Types
+
+```typescript
+// generated/loaders.ts
+
+export interface LoaderDefinitions {
+  user: DataLoader<UserId, User | null>
+  userPosts: DataLoader<UserId, Post[], { first?: number; after?: string }>
+  userPostsCount: DataLoader<UserId, number>
+  userProfile: DataLoader<UserId, Profile | null>
+  postAuthor: DataLoader<PostId, User>
+  postComments: DataLoader<PostId, Comment[], { first?: number }>
+}
+
+export interface DataLoaderContext {
+  readonly loaders: LoaderDefinitions
+}
+
+// Loader keys are typed based on opaque types
+export type UserId = string & { readonly __brand: 'UserId' }
+export type PostId = string & { readonly __brand: 'PostId' }
+```
+
+### 7.7 Loader Lifecycle
+
+```typescript
+const server = createServer({
+  schema,
+  resolvers,
+  loaders: createLoaders,  // Factory function called per-request
+
+  context: async (req) => {
+    const db = createDbConnection()
+
+    // Loaders are created fresh for each request
+    // No cross-request cache pollution
+    return {
+      db,
+      // loaders are automatically injected by SDK
+    }
+  },
+})
+```
+
+### 7.8 Performance Considerations
+
+| Pattern | Without DataLoader | With DataLoader |
+|---------|-------------------|-----------------|
+| `users(first: 10) { posts }` | 1 + 10 = 11 queries | 1 + 1 = 2 queries |
+| `users(first: 100) { posts, comments }` | 1 + 200 = 201 queries | 1 + 2 = 3 queries |
+| Nested relations (3 levels) | 1 + N + N² queries | 1 + 1 + 1 = 3 queries |
+
+**Best practices:**
+- Always use loaders for field resolvers on list types
+- Prime cache after creating/updating entities
+- Clear cache after mutations that affect related entities
+- Use `loadMany` when you have multiple keys upfront
 
 ## 8. Streaming Support
 
@@ -741,13 +977,34 @@ const server = createServer({
 });
 ```
 
-### 12.3 Logging
+### 12.3 Structured Logging
+
+The SDK provides built-in structured logging with distributed trace context:
 
 ```typescript
+import { createServer, JsonLogger, ConsoleLogger } from "@bgql/server";
+
 const server = createServer({
   logging: {
-    // Structured logging
-    format: "json",
+    // Use JSON logger for production (log aggregators)
+    logger: new JsonLogger({
+      output: process.stdout,
+      minLevel: "info",
+      pretty: false,
+    }),
+
+    // Or use ConsoleLogger for development
+    // logger: new ConsoleLogger({ colors: true }),
+
+    // What to log
+    logOperations: true,      // Log query/mutation start/end
+    logResolvers: false,      // Log individual resolver calls (verbose)
+    logDataLoaders: true,     // Log DataLoader batches
+    logErrors: true,          // Log errors with stack traces
+    logSlowQueries: 100,      // Log queries taking > 100ms
+
+    // Redact sensitive fields from logs
+    redact: ["password", "token", "secret", "authorization"],
 
     // Log levels per operation type
     levels: {
@@ -756,11 +1013,144 @@ const server = createServer({
       subscription: "debug",
       error: "error",
     },
-
-    // Redact sensitive fields
-    redact: ["password", "token", "secret"],
   },
 });
+```
+
+#### Log Entry Structure
+
+```typescript
+// Every log entry includes trace context for distributed tracing
+interface BgqlLogEntry {
+  timestamp: string;
+  level: "debug" | "info" | "warn" | "error";
+
+  // Distributed trace context
+  traceId: string;           // Propagated across services
+  spanId: string;            // Current operation span
+  parentSpanId?: string;     // Parent span for correlation
+
+  // Operation context
+  operation?: {
+    type: "query" | "mutation" | "subscription";
+    name: string;
+    hash: string;            // Persisted query hash
+  };
+
+  // Resolver context (when logResolvers: true)
+  resolver?: {
+    parentType: string;
+    fieldName: string;
+    path: string[];
+    duration: number;        // Execution time in ms
+  };
+
+  // DataLoader context (when logDataLoaders: true)
+  loader?: {
+    name: string;
+    batchSize: number;
+    cacheHits: number;
+    duration: number;
+  };
+
+  // Error context
+  error?: {
+    message: string;
+    code: string;
+    stack?: string;
+    extensions?: Record<string, unknown>;
+  };
+
+  // Custom fields
+  fields: Record<string, unknown>;
+}
+```
+
+#### Trace Context Propagation
+
+```typescript
+const server = createServer({
+  logging: {
+    // Extract trace context from incoming request headers
+    extractTraceContext: (req) => ({
+      traceId: req.headers.get("x-trace-id") ?? generateTraceId(),
+      parentSpanId: req.headers.get("x-span-id"),
+    }),
+
+    // Or use W3C Trace Context format (traceparent header)
+    traceContextFormat: "w3c",
+
+    // Inject trace context into outgoing requests
+    injectTraceContext: (headers, ctx) => {
+      headers.set("x-trace-id", ctx.traceId);
+      headers.set("x-span-id", ctx.spanId);
+    },
+  },
+});
+```
+
+#### Example Log Output
+
+```json
+{"timestamp":"2024-01-15T10:30:00.000Z","level":"info","traceId":"abc123","spanId":"def456","operation":{"type":"query","name":"GetUser","hash":"a1b2c3"},"message":"Query started"}
+{"timestamp":"2024-01-15T10:30:00.050Z","level":"debug","traceId":"abc123","spanId":"ghi789","parentSpanId":"def456","loader":{"name":"user","batchSize":3,"cacheHits":1,"duration":45},"message":"DataLoader batch completed"}
+{"timestamp":"2024-01-15T10:30:00.100Z","level":"info","traceId":"abc123","spanId":"def456","operation":{"type":"query","name":"GetUser","hash":"a1b2c3"},"duration":100,"message":"Query completed"}
+```
+
+#### Custom Loggers
+
+```typescript
+import type { Logger, LogEntry } from "@bgql/server";
+
+// Implement custom logger (e.g., for external logging services)
+class DatadogLogger implements Logger {
+  log(entry: LogEntry): void {
+    // Send to Datadog
+    fetch("https://http-intake.logs.datadoghq.com/v1/input", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "DD-API-KEY": process.env.DD_API_KEY!,
+      },
+      body: JSON.stringify({
+        ...entry,
+        service: "my-graphql-api",
+        source: "bgql",
+      }),
+    });
+  }
+}
+
+const server = createServer({
+  logging: {
+    logger: new DatadogLogger(),
+  },
+});
+```
+
+#### Contextual Logging in Resolvers
+
+```typescript
+const resolvers: Resolvers = {
+  Query: {
+    user: async (_, { id }, ctx) => {
+      // Add custom fields to log context
+      ctx.log.addField("userId", id);
+
+      // Log custom events
+      ctx.log.info("Looking up user", { source: "cache" });
+
+      const user = await ctx.loaders.user.load(id);
+
+      if (!user) {
+        ctx.log.warn("User not found", { userId: id });
+        return notFoundError("User", id);
+      }
+
+      return user;
+    },
+  },
+};
 ```
 
 ## 13. Security

@@ -1,0 +1,62 @@
+{
+  "name": "@bgql/client",
+  "version": "0.1.0",
+  "description": "Type-safe GraphQL client for bgql schemas",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./vue": {
+      "import": "./dist/vue/index.js",
+      "types": "./dist/vue/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts src/vue/index.ts --format esm --dts",
+    "dev": "tsdown src/index.ts src/vue/index.ts --format esm --dts --watch",
+    "test": "vitest",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --type-aware --fix",
+    "fmt": "oxfmt --write src",
+    "fmt:check": "oxfmt --check src"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "oxfmt": "^0.27.0",
+    "oxlint": "^1.42.0",
+    "@typescript/native-preview": "^7.0.0-dev.20250122",
+    "tsdown": "^0.9.0",
+    "typescript": "^5.3.0",
+    "vitest": "^2.0.0",
+    "vue": "^3.4.0"
+  },
+  "peerDependencies": {
+    "vue": "^3.3.0"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "graphql",
+    "client",
+    "typescript",
+    "bgql"
+  ],
+  "author": "ubugeeei",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ubugeeei/bgql"
+  }
+}

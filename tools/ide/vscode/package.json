@@ -1,0 +1,119 @@
+{
+  "name": "bgql-vscode",
+  "displayName": "Better GraphQL",
+  "description": "Better GraphQL language support for VS Code",
+  "version": "0.1.0",
+  "publisher": "ubugeeei",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ubugeeei/bgql"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "graphql",
+    "bgql",
+    "better-graphql",
+    "api",
+    "schema"
+  ],
+  "activationEvents": [
+    "onLanguage:bgql"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "bgql",
+        "aliases": ["Better GraphQL", "bgql"],
+        "extensions": [".bgql"],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/logo-icon.svg",
+          "dark": "./icons/logo-icon.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bgql",
+        "scopeName": "source.bgql",
+        "path": "./syntaxes/bgql.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Better GraphQL",
+      "properties": {
+        "bgql.lsp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Better GraphQL language server"
+        },
+        "bgql.lsp.path": {
+          "type": "string",
+          "default": "bgql",
+          "description": "Path to the bgql binary"
+        },
+        "bgql.format.tabSize": {
+          "type": "number",
+          "default": 2,
+          "description": "Tab size for formatting"
+        },
+        "bgql.validation.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable schema validation"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "bgql.restartServer",
+        "title": "Restart Language Server",
+        "category": "Better GraphQL"
+      },
+      {
+        "command": "bgql.formatDocument",
+        "title": "Format Document",
+        "category": "Better GraphQL"
+      },
+      {
+        "command": "bgql.generateTypes",
+        "title": "Generate Types",
+        "category": "Better GraphQL"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "bun run compile",
+    "compile": "tsdown src/extension.ts --format cjs --outDir out",
+    "watch": "tsdown src/extension.ts --format cjs --outDir out --watch",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --type-aware --fix",
+    "fmt": "oxfmt --write src",
+    "fmt:check": "oxfmt --check src",
+    "typecheck": "tsc --noEmit",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.27.0",
+    "oxlint": "^1.42.0",
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript/native-preview": "^7.0.0-dev.20250122",
+    "@vscode/vsce": "^2.22.0",
+    "tsdown": "^0.9.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

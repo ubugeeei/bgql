@@ -1179,3 +1179,287 @@ const fullContent = await article.fullContent;
 | @sanitize directive | Server-side HTML sanitization |
 | Vue integration | Safe v-html with Trusted Types |
 | Streaming support | Sanitization with @defer/@stream |
+
+## 15. Binary Streaming Protocol
+
+Better GraphQL provides a native binary streaming protocol for efficient transfer of media content and large files.
+
+### 15.1 Content Type
+
+Binary streams use a custom content type:
+
+```
+Content-Type: application/vnd.bgql.binary-stream
+```
+
+### 15.2 Request Headers
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `Accept` | Request binary stream | `application/vnd.bgql.binary-stream` |
+| `X-BGQL-Stream-Id` | Stream identifier | `uuid-v4` |
+| `Range` | Byte range request | `bytes=1024-2048` |
+
+### 15.3 Response Headers
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `Content-Type` | Binary stream type | `application/vnd.bgql.binary-stream` |
+| `X-BGQL-Stream-Id` | Stream identifier | `uuid-v4` |
+| `X-BGQL-Content-Type` | Original content type | `video/mp4` |
+| `X-BGQL-Total-Size` | Total size in bytes | `104857600` |
+| `X-BGQL-Chunk-Size` | Chunk size in bytes | `65536` |
+
+### 15.4 Frame Format
+
+Each chunk in the binary stream follows this format:
+
+```
++----------------+----------------+-------+----------------+----------+
+| Sequence (4B)  | Length (4B)    | Flags | Payload        | CRC32    |
+| Big-endian u32 | Big-endian u32 | (1B)  | (variable)     | (4B)     |
++----------------+----------------+-------+----------------+----------+
+```
+
+**Flags:**
+- `0x01` - FINAL: Last chunk in stream
+- `0x02` - ERROR: Payload contains error message
+- `0x04` - METADATA: Payload contains metadata (JSON)
+
+### 15.5 Example Binary Stream Request
+
+```http
+GET /graphql/binary/stream-id-123 HTTP/1.1
+Accept: application/vnd.bgql.binary-stream
+X-BGQL-Stream-Id: stream-id-123
+```
+
+### 15.6 Example Binary Stream Response
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/vnd.bgql.binary-stream
+X-BGQL-Stream-Id: stream-id-123
+X-BGQL-Content-Type: video/mp4
+X-BGQL-Total-Size: 10485760
+X-BGQL-Chunk-Size: 65536
+Transfer-Encoding: chunked
+
+[Binary frame 1: sequence=0, length=65536, flags=0x00, payload=..., crc=...]
+[Binary frame 2: sequence=1, length=65536, flags=0x00, payload=..., crc=...]
+...
+[Binary frame N: sequence=N, length=12345, flags=0x01, payload=..., crc=...]
+```
+
+### 15.7 Range Requests
+
+Binary streams support HTTP range requests for seeking:
+
+```http
+GET /graphql/binary/stream-id-123 HTTP/1.1
+Accept: application/vnd.bgql.binary-stream
+Range: bytes=1048576-
+```
+
+Response:
+
+```http
+HTTP/1.1 206 Partial Content
+Content-Type: application/vnd.bgql.binary-stream
+Content-Range: bytes 1048576-10485759/10485760
+```
+
+### 15.8 Pause and Resume
+
+Clients can pause and resume binary streams using the stream ID:
+
+**Pause:**
+Close the connection while noting the last received sequence number.
+
+**Resume:**
+```http
+GET /graphql/binary/stream-id-123 HTTP/1.1
+Accept: application/vnd.bgql.binary-stream
+X-BGQL-Resume-Sequence: 42
+```
+
+## 16. HTTP Live Streaming (HLS) Support
+
+Better GraphQL provides native HLS support for adaptive bitrate streaming.
+
+### 16.1 HLS Manifest Request
+
+```graphql
+query GetVideoStream($id: ID!) {
+  video(id: $id) {
+    title
+    hlsManifest {
+      url
+      variants {
+        bandwidth
+        resolution
+        codecs
+      }
+    }
+  }
+}
+```
+
+### 16.2 HLS Response Headers
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `Content-Type` | HLS playlist type | `application/vnd.apple.mpegurl` |
+| `X-BGQL-HLS-Type` | Playlist type | `master` or `media` |
+
+### 16.3 Master Playlist Format
+
+```m3u8
+#EXTM3U
+#EXT-X-VERSION:6
+
+#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360,CODECS="avc1.4d001f,mp4a.40.2"
+/graphql/hls/stream-123/360p.m3u8
+
+#EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=854x480,CODECS="avc1.4d001f,mp4a.40.2"
+/graphql/hls/stream-123/480p.m3u8
+
+#EXT-X-STREAM-INF:BANDWIDTH=2800000,RESOLUTION=1280x720,CODECS="avc1.4d001f,mp4a.40.2"
+/graphql/hls/stream-123/720p.m3u8
+
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080,CODECS="avc1.640028,mp4a.40.2"
+/graphql/hls/stream-123/1080p.m3u8
+```
+
+### 16.4 Media Playlist Format
+
+```m3u8
+#EXTM3U
+#EXT-X-VERSION:6
+#EXT-X-TARGETDURATION:6
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-PLAYLIST-TYPE:VOD
+
+#EXTINF:6.000,
+/graphql/hls/stream-123/720p/segment-0.ts
+#EXTINF:6.000,
+/graphql/hls/stream-123/720p/segment-1.ts
+#EXTINF:6.000,
+/graphql/hls/stream-123/720p/segment-2.ts
+#EXTINF:4.500,
+/graphql/hls/stream-123/720p/segment-3.ts
+
+#EXT-X-ENDLIST
+```
+
+### 16.5 Live Streaming
+
+For live content, use `EXT-X-PLAYLIST-TYPE:EVENT` or omit for live streams:
+
+```m3u8
+#EXTM3U
+#EXT-X-VERSION:6
+#EXT-X-TARGETDURATION:6
+#EXT-X-MEDIA-SEQUENCE:1234
+
+#EXTINF:6.000,
+/graphql/hls/live-stream/segment-1234.ts
+#EXTINF:6.000,
+/graphql/hls/live-stream/segment-1235.ts
+#EXTINF:6.000,
+/graphql/hls/live-stream/segment-1236.ts
+```
+
+## 17. Query Scheduling
+
+### 17.1 Priority Headers
+
+Clients can specify query priority in headers:
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `X-BGQL-Priority` | Priority level (1-10) | `1` |
+| `X-BGQL-Deadline` | Completion deadline | `2024-01-01T00:00:00Z` |
+
+### 17.2 Resource Hints
+
+```http
+POST /graphql HTTP/1.1
+Content-Type: application/json
+X-BGQL-Priority: 2
+X-BGQL-Resource-Hint: high-cpu
+
+{"query": "query { generateReport { ... } }"}
+```
+
+### 17.3 Scheduler Response Headers
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `X-BGQL-Queue-Position` | Position in queue | `3` |
+| `X-BGQL-Estimated-Start` | Estimated start time | `2024-01-01T00:00:05Z` |
+| `X-BGQL-Task-Id` | Task identifier | `uuid-v4` |
+
+## 18. Checkpoint and Resume Protocol
+
+### 18.1 Checkpoint Headers
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `X-BGQL-Checkpoint-Id` | Checkpoint identifier | `uuid-v4` |
+| `X-BGQL-Resume-Token` | Token for resuming | `base64-encoded` |
+| `X-BGQL-Checkpoint-TTL` | Time until checkpoint expires | `3600` |
+
+### 18.2 Creating Checkpoints
+
+The server automatically creates checkpoints for `@resumable` queries:
+
+```json
+{
+  "data": { "feed": [...] },
+  "extensions": {
+    "checkpoint": {
+      "id": "ckpt-123",
+      "resumeToken": "eyJwb3NpdGlvbiI6...",
+      "expiresAt": "2024-01-01T01:00:00Z",
+      "position": {
+        "path": ["feed"],
+        "streamCursor": "cursor-456"
+      }
+    }
+  }
+}
+```
+
+### 18.3 Resuming from Checkpoint
+
+```http
+POST /graphql HTTP/1.1
+Content-Type: application/json
+X-BGQL-Resume-Token: eyJwb3NpdGlvbiI6...
+
+{"query": "query GetLargeFeed @resumable { ... }"}
+```
+
+### 18.4 Pause Request
+
+To pause an ongoing query:
+
+```http
+POST /graphql/pause HTTP/1.1
+Content-Type: application/json
+
+{"taskId": "task-789"}
+```
+
+Response:
+
+```json
+{
+  "checkpoint": {
+    "id": "ckpt-123",
+    "resumeToken": "eyJwb3NpdGlvbiI6...",
+    "partialData": { "feed": [...] }
+  }
+}
+```

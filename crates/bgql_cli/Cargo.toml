@@ -1,0 +1,30 @@
+[package]
+name = "bgql_cli"
+description = "Command-line interface for Better GraphQL"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "bgql"
+path = "src/main.rs"
+
+[dependencies]
+bgql_core.workspace = true
+bgql_syntax.workspace = true
+bgql_semantic.workspace = true
+bgql_resolver.workspace = true
+bgql_runtime.workspace = true
+bgql_sdk.workspace = true
+bgql_lsp.workspace = true
+clap.workspace = true
+colored.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde_json.workspace = true
+
+[features]
+default = []

@@ -400,7 +400,69 @@ async fn main() {
 }
 ```
 
-## 7. DataLoader Implementation
+## 7. DataLoader Library
+
+The bgql Rust Server SDK provides a built-in DataLoader library for automatic N+1 query prevention with zero-cost abstractions.
+
+### 7.1 Core Concepts
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  GraphQL Request                                             │
+│  query { users(first: 3) { id, posts(first: 5) { title } } }│
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  DataLoader Batching                                         │
+│  load(user1_id) ─┐                                          │
+│  load(user2_id) ─┼─► Single batch call                      │
+│  load(user3_id) ─┘                                          │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Database Query (1 query instead of N)                      │
+│  SELECT * FROM posts WHERE author_id IN ($1, $2, $3)        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 7.2 Library API
+
+```rust
+use better_graphql::dataloader::{DataLoader, BatchLoadFn};
+
+/// DataLoader trait
+pub trait DataLoader<K, V, A = ()>: Send + Sync {
+    /// Load a single value (batched automatically)
+    async fn load(&self, key: K, args: A) -> Result<V, Error>;
+
+    /// Load multiple values
+    async fn load_many(&self, keys: Vec<K>, args: A) -> Result<HashMap<K, V>, Error>;
+
+    /// Clear cached value for key
+    fn clear(&self, key: &K);
+
+    /// Clear all cached values
+    fn clear_all(&self);
+
+    /// Prime the cache with a value
+    fn prime(&self, key: K, value: V);
+}
+
+/// Batch load function trait
+#[async_trait]
+pub trait BatchLoadFn<K, V, A = ()>: Send + Sync {
+    async fn load_batch(
+        &self,
+        keys: Vec<K>,
+        args: A,
+        ctx: &Context,
+    ) -> Result<HashMap<K, V>, Error>;
+}
+```
+
+### 7.3 Defining Loaders
 
 > **Note**: The examples below use SeaORM, but you can use any ORM or query builder you prefer (Diesel, sqlx, cornucopia, etc.).
 
@@ -423,7 +485,33 @@ impl AppLoaders {
     }
 }
 
-// Implement batch loader for User.posts
+// Simple key-value loader (no args)
+#[async_trait]
+impl UserLoader for AppLoaders {
+    async fn load_batch(
+        &self,
+        user_ids: Vec<UserId>,
+        _args: &(),
+        _ctx: &Context,
+    ) -> Result<HashMap<UserId, Option<User>>, Error> {
+        let ids: Vec<String> = user_ids.iter().map(|id| id.0.clone()).collect();
+
+        let users = user::Entity::find()
+            .filter(user::Column::Id.is_in(&ids))
+            .all(&self.db)
+            .await?;
+
+        let user_map: HashMap<_, _> = users.into_iter()
+            .map(|u| (UserId(u.id.clone()), Some(u.into())))
+            .collect();
+
+        Ok(user_ids.into_iter()
+            .map(|id| (id.clone(), user_map.get(&id).cloned().flatten()))
+            .collect())
+    }
+}
+
+// Loader with field arguments
 #[async_trait]
 impl UserPostsLoader for AppLoaders {
     async fn load_batch(
@@ -457,7 +545,7 @@ impl UserPostsLoader for AppLoaders {
     }
 }
 
-// Implement batch loader for User.postsCount
+// Aggregation loader
 #[async_trait]
 impl UserPostsCountLoader for AppLoaders {
     async fn load_batch(
@@ -468,7 +556,6 @@ impl UserPostsCountLoader for AppLoaders {
     ) -> Result<HashMap<UserId, u32>, Error> {
         let ids: Vec<String> = user_ids.iter().map(|id| id.0.clone()).collect();
 
-        // Using raw query for GROUP BY with SeaORM
         #[derive(FromQueryResult)]
         struct CountResult {
             author_id: String,
@@ -495,7 +582,7 @@ impl UserPostsCountLoader for AppLoaders {
     }
 }
 
-// Implement batch loader for User.followers
+// One-to-many relation loader
 #[async_trait]
 impl UserFollowersLoader for AppLoaders {
     async fn load_batch(
@@ -506,7 +593,6 @@ impl UserFollowersLoader for AppLoaders {
     ) -> Result<HashMap<UserId, Vec<User>>, Error> {
         let ids: Vec<String> = user_ids.iter().map(|id| id.0.clone()).collect();
 
-        // Query follows with related users
         let follows_with_users = follow::Entity::find()
             .filter(follow::Column::FollowingId.is_in(&ids))
             .find_also_related(user::Entity)
@@ -529,6 +615,159 @@ impl UserFollowersLoader for AppLoaders {
             .collect())
     }
 }
+```
+
+### 7.4 Using Loaders in Resolvers
+
+```rust
+#[async_trait]
+impl QueryResolver for AppResolvers {
+    async fn user(&self, ctx: &Context, id: UserId) -> Result<UserResult, Error> {
+        // Single load - batched with other loads in same tick
+        match ctx.loaders.user.load(id.clone(), ()).await? {
+            Some(user) => Ok(UserResult::User(user)),
+            None => Ok(UserResult::NotFoundError(NotFoundError {
+                message: "User not found".into(),
+                resource_type: "User".into(),
+                resource_id: id.0,
+                code: "NOT_FOUND".into(),
+            })),
+        }
+    }
+}
+
+#[async_trait]
+impl UserResolver for AppResolvers {
+    async fn posts(
+        &self,
+        ctx: &Context,
+        user: &User,
+        first: Option<i32>,
+        after: Option<String>,
+    ) -> Result<Vec<Post>, Error> {
+        // Automatically batched across all User instances
+        ctx.loaders.user_posts.load(user.id.clone(), PostsArgs { first, after }).await
+    }
+
+    async fn posts_count(&self, ctx: &Context, user: &User) -> Result<u32, Error> {
+        ctx.loaders.user_posts_count.load(user.id.clone(), ()).await
+    }
+}
+```
+
+### 7.5 Advanced Patterns
+
+#### Cache Priming
+
+```rust
+#[async_trait]
+impl QueryResolver for AppResolvers {
+    async fn users(
+        &self,
+        ctx: &Context,
+        first: Option<i32>,
+        _after: Option<String>,
+        _filter: Option<UserFilter>,
+        _order_by: Option<UserOrderBy>,
+    ) -> Result<Vec<User>, Error> {
+        let users = self.db.users()
+            .limit(first.unwrap_or(10))
+            .all()
+            .await?;
+
+        // Prime the cache for subsequent user(id) calls
+        for user in &users {
+            ctx.loaders.user.prime(user.id.clone(), Some(user.clone()));
+        }
+
+        Ok(users)
+    }
+}
+```
+
+#### Cache Invalidation
+
+```rust
+#[async_trait]
+impl MutationResolver for AppResolvers {
+    async fn update_user(
+        &self,
+        ctx: &Context,
+        input: UpdateUserInput,
+    ) -> Result<UpdateUserResult, Error> {
+        let user = self.db.users()
+            .update(input.id.clone(), input)
+            .await?;
+
+        // Clear stale cache entry
+        ctx.loaders.user.clear(&input.id);
+
+        // Or prime with new value
+        ctx.loaders.user.prime(input.id, Some(user.clone()));
+
+        Ok(UpdateUserResult::User(user))
+    }
+}
+```
+
+### 7.6 Generated Types
+
+```rust
+// generated/loaders.rs
+
+use async_trait::async_trait;
+use std::collections::HashMap;
+
+/// User loader - loads users by ID
+#[async_trait]
+pub trait UserLoader: Send + Sync {
+    async fn load_batch(
+        &self,
+        keys: Vec<UserId>,
+        args: &(),
+        ctx: &Context,
+    ) -> Result<HashMap<UserId, Option<User>>, Error>;
+}
+
+/// UserPosts loader - loads posts for users with pagination
+#[async_trait]
+pub trait UserPostsLoader: Send + Sync {
+    async fn load_batch(
+        &self,
+        keys: Vec<UserId>,
+        args: &PostsArgs,
+        ctx: &Context,
+    ) -> Result<HashMap<UserId, Vec<Post>>, Error>;
+}
+
+#[derive(Clone, Debug)]
+pub struct PostsArgs {
+    pub first: Option<i32>,
+    pub after: Option<String>,
+}
+
+/// DataLoaders container
+pub struct DataLoaders {
+    pub user: Box<dyn UserLoader>,
+    pub user_posts: Box<dyn UserPostsLoader>,
+    pub user_posts_count: Box<dyn UserPostsCountLoader>,
+    pub user_followers: Box<dyn UserFollowersLoader>,
+}
+```
+
+### 7.7 Performance Considerations
+
+| Pattern | Without DataLoader | With DataLoader |
+|---------|-------------------|-----------------|
+| `users(first: 10) { posts }` | 1 + 10 = 11 queries | 1 + 1 = 2 queries |
+| `users(first: 100) { posts, comments }` | 1 + 200 = 201 queries | 1 + 2 = 3 queries |
+| Nested relations (3 levels) | 1 + N + N² queries | 1 + 1 + 1 = 3 queries |
+
+**Best practices:**
+- Always use loaders for field resolvers on list types
+- Prime cache after creating/updating entities
+- Clear cache after mutations that affect related entities
+- Use `load_many` when you have multiple keys upfront
 ```
 
 ## 8. Streaming Support

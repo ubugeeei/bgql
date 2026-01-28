@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>bgql DevTools</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #1e1e1e;
+      --bg-secondary: #252526;
+      --bg-tertiary: #2d2d30;
+      --text-primary: #cccccc;
+      --text-secondary: #9d9d9d;
+      --accent: #6fbf73;
+      --accent-hover: #8dd690;
+      --border: #3c3c3c;
+      --error: #f44747;
+      --warning: #cca700;
+      --success: #4ec9b0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--accent);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .tab {
+      padding: 6px 12px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .tab:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .tab.active {
+      background: var(--bg-tertiary);
+      color: var(--accent);
+    }
+
+    .toolbar {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-btn {
+      padding: 4px 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .toolbar-btn:hover {
+      background: var(--border);
+    }
+
+    .toolbar-btn.danger {
+      border-color: var(--error);
+      color: var(--error);
+    }
+
+    .filter-input {
+      flex: 1;
+      padding: 4px 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .filter-input::placeholder {
+      color: var(--text-secondary);
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .panel {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .panel.hidden {
+      display: none;
+    }
+
+    .query-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .query-item {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .query-header {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .query-header:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .query-type {
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .query-type.query {
+      background: rgba(78, 201, 176, 0.2);
+      color: var(--success);
+    }
+
+    .query-type.mutation {
+      background: rgba(204, 167, 0, 0.2);
+      color: var(--warning);
+    }
+
+    .query-type.subscription {
+      background: rgba(111, 191, 115, 0.2);
+      color: var(--accent);
+    }
+
+    .query-name {
+      flex: 1;
+      font-weight: 500;
+    }
+
+    .query-status {
+      font-size: 10px;
+    }
+
+    .query-status.success {
+      color: var(--success);
+    }
+
+    .query-status.error {
+      color: var(--error);
+    }
+
+    .query-time {
+      color: var(--text-secondary);
+      font-size: 10px;
+    }
+
+    .query-details {
+      border-top: 1px solid var(--border);
+      padding: 12px;
+      display: none;
+    }
+
+    .query-item.expanded .query-details {
+      display: block;
+    }
+
+    .detail-section {
+      margin-bottom: 12px;
+    }
+
+    .detail-title {
+      font-size: 10px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .code-block {
+      background: var(--bg-tertiary);
+      padding: 8px;
+      border-radius: 4px;
+      font-family: 'Fira Code', 'Monaco', monospace;
+      font-size: 11px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-secondary);
+      text-align: center;
+      padding: 40px;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-title {
+      font-size: 16px;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .schema-tree {
+      font-family: 'Fira Code', 'Monaco', monospace;
+      font-size: 12px;
+    }
+
+    .schema-type {
+      padding: 4px 0;
+    }
+
+    .schema-type-name {
+      color: var(--accent);
+      cursor: pointer;
+    }
+
+    .schema-type-name:hover {
+      text-decoration: underline;
+    }
+
+    .schema-field {
+      padding-left: 16px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="logo">⚡ bgql</span>
+    <div class="tabs">
+      <button class="tab active" data-panel="queries">Queries</button>
+      <button class="tab" data-panel="schema">Schema</button>
+      <button class="tab" data-panel="cache">Cache</button>
+      <button class="tab" data-panel="settings">Settings</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="toolbar-btn" id="clearBtn">Clear</button>
+    <button class="toolbar-btn" id="preserveBtn">Preserve Log</button>
+    <input type="text" class="filter-input" placeholder="Filter queries..." id="filterInput">
+  </div>
+
+  <div class="main">
+    <!-- Queries Panel -->
+    <div class="panel" id="queries-panel">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">📡</div>
+        <div class="empty-title">No GraphQL Queries Detected</div>
+        <p>Make a GraphQL request to see it here.</p>
+      </div>
+      <div class="query-list" id="query-list"></div>
+    </div>
+
+    <!-- Schema Panel -->
+    <div class="panel hidden" id="schema-panel">
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">No Schema Loaded</div>
+        <p>Connect to a bgql endpoint to load the schema.</p>
+      </div>
+    </div>
+
+    <!-- Cache Panel -->
+    <div class="panel hidden" id="cache-panel">
+      <div class="empty-state">
+        <div class="empty-icon">💾</div>
+        <div class="empty-title">Cache Inspector</div>
+        <p>View and manage the GraphQL cache.</p>
+      </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="panel hidden" id="settings-panel">
+      <div style="padding: 20px;">
+        <h3 style="margin-bottom: 16px;">Settings</h3>
+        <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <input type="checkbox" id="interceptAll">
+          Intercept all GraphQL requests
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <input type="checkbox" id="showTimings" checked>
+          Show request timings
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="highlightErrors" checked>
+          Highlight errors
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script src="src/panel.js"></script>
+</body>
+</html>

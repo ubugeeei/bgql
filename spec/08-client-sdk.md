@@ -3144,7 +3144,228 @@ const client = createClient({
 });
 ```
 
-## 13. Summary
+## 13. Browser DevTools Extension
+
+The bgql client SDK includes a browser extension for debugging GraphQL operations in real-time.
+
+### 13.1 Installation
+
+```bash
+# Build the extension
+cd npm/client/devtools
+bun run build
+
+# Chrome: Load unpacked extension from dist/chrome
+# Firefox: Load temporary add-on from dist/firefox/manifest.json
+```
+
+### 13.2 Client Integration
+
+```typescript
+import { createClient } from "@bgql/client";
+import { devtools } from "@bgql/client/devtools";
+
+const client = createClient({
+  endpoint: "/graphql",
+  plugins: [
+    devtools({
+      name: "My App",                    // Display name in DevTools
+      enabled: import.meta.env.DEV,      // Only enable in development
+      logToConsole: false,               // Don't duplicate logs
+      maxEntries: 100,                   // Limit stored operations
+    }),
+  ],
+});
+```
+
+### 13.3 DevTools Panels
+
+#### Query Inspector
+
+Real-time view of all GraphQL operations:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ bgql DevTools                                   [Queries ▼] │
+├─────────────────────────────────────────────────────────────┤
+│ ● GetUser              query     150ms   ✓ Success          │
+│   ├─ Variables: { id: "user_1" }                            │
+│   ├─ Trace ID: abc123-def456                                │
+│   └─ Streaming:                                             │
+│       ├─ @defer: stats (45ms)                               │
+│       └─ @stream: posts (3 items, 89ms)                     │
+├─────────────────────────────────────────────────────────────┤
+│ ● CreatePost           mutation  230ms   ✓ Success          │
+│   └─ Variables: { input: { title: "...", ... } }            │
+├─────────────────────────────────────────────────────────────┤
+│ ○ FeedSubscription     subscription  ⏳ Active              │
+│   └─ Events: 12 received                                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- Filter by operation type (query/mutation/subscription)
+- Search by operation name or variables
+- View full request/response payloads
+- Copy operations as cURL commands
+
+#### Streaming Visualizer
+
+Timeline view for `@defer` and `@stream` operations:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Query: GetDashboard                                         │
+├─────────────────────────────────────────────────────────────┤
+│ Timeline                                                    │
+│ ├─ 0ms   ────●──── Initial response                         │
+│ │              user.id, user.name, user.avatarUrl           │
+│ │                                                           │
+│ ├─ 45ms  ────────●──── @defer(label: "stats")               │
+│ │                   postsCount: 42, followersCount: 128     │
+│ │                                                           │
+│ ├─ 80ms  ────────────●── @stream(label: "feed") [0-2]       │
+│ │                        3 items received                   │
+│ │                                                           │
+│ ├─ 120ms ─────────────●── @stream(label: "feed") [3-5]      │
+│ │                         3 items received                  │
+│ │                                                           │
+│ └─ 160ms ──────────────●── @stream(label: "feed") [6-9]     │
+│                            4 items received (final)         │
+│                                                             │
+│ Total: 9 stream chunks, 1 defer payload                     │
+│                                                             │
+│ [▶ Replay] [📋 Copy Response] [📥 Export HAR]               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- Visual timeline of all streaming chunks
+- Inspect each chunk's payload
+- Replay streaming sequence
+- Export as HAR for sharing
+
+#### Cache Explorer
+
+Inspect the normalized cache contents:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Normalized Cache                          [🔍 Search types] │
+├─────────────────────────────────────────────────────────────┤
+│ ▼ User (3 entries)                                          │
+│   ├─ User:user_1                                            │
+│   │   {                                                     │
+│   │     "id": "user_1",                                     │
+│   │     "name": "Alice",                                    │
+│   │     "email": "alice@example.com",                       │
+│   │     "__typename": "User"                                │
+│   │   }                                                     │
+│   ├─ User:user_2                                            │
+│   └─ User:user_3                                            │
+│                                                             │
+│ ▼ Post (12 entries)                                         │
+│   ├─ Post:post_1                                            │
+│   │   { "id": "post_1", "title": "Hello", ... }             │
+│   └─ ... (11 more)                                          │
+│                                                             │
+│ ▶ Query (2 entries)                                         │
+│ ▶ __META__ (1 entry)                                        │
+│                                                             │
+│ Cache size: 45.2 KB | Entries: 18                           │
+│ [🗑️ Clear Cache] [📋 Export JSON]                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- Search and filter by type
+- View entity relationships
+- Track cache updates in real-time
+- Clear cache for testing
+
+#### Network Timeline
+
+Waterfall visualization of network requests:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Network                                        [Clear All]  │
+├─────────────────────────────────────────────────────────────┤
+│ Request          Status   Time      Size                    │
+├─────────────────────────────────────────────────────────────┤
+│ GetUser          200 OK   150ms     2.4 KB                  │
+│ ├────────█████████████████───────────────────────────────── │
+│ │        ↑ Initial        ↑ @defer                          │
+│                                                             │
+│ GetDashboard     200 OK   320ms     12.1 KB                 │
+│ ├───█████─────█████─────█████─────█████───────────────────  │
+│ │   ↑          ↑          ↑         ↑ @stream chunks        │
+│                                                             │
+│ CreatePost       200 OK   89ms      0.8 KB                  │
+│ ├────████████────────────────────────────────────────────── │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- Visual waterfall of streaming chunks
+- Request/response size breakdown
+- Headers and timing details
+- Binary stream progress
+
+#### Schema Browser
+
+Navigate and search the GraphQL schema:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Schema                                    [🔍 Search types] │
+├─────────────────────────────────────────────────────────────┤
+│ ▼ Types                                                     │
+│   ├─ User                                                   │
+│   │   """A registered user in the system"""                 │
+│   │   type User {                                           │
+│   │     id: UserId!                                         │
+│   │     name: String!                                       │
+│   │     email: String!                                      │
+│   │     posts(first: Int): [Post!]!                         │
+│   │   }                                                     │
+│   ├─ Post                                                   │
+│   └─ ...                                                    │
+│                                                             │
+│ ▼ Queries                                                   │
+│   ├─ user(id: UserId!): UserResult!                         │
+│   └─ users(first: Int, after: String): UserConnection!      │
+│                                                             │
+│ ▶ Mutations                                                 │
+│ ▶ Subscriptions                                             │
+│ ▶ Directives                                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- Full schema documentation
+- Click-through type navigation
+- Search by type/field name
+- Copy SDL definitions
+
+### 13.4 DevTools Protocol
+
+The devtools extension communicates via a simple message protocol:
+
+```typescript
+// Message types
+type DevToolsMessage =
+  | { type: "operation:start"; id: string; operation: OperationInfo }
+  | { type: "operation:data"; id: string; data: unknown }
+  | { type: "operation:defer"; id: string; label: string; data: unknown }
+  | { type: "operation:stream"; id: string; label: string; items: unknown[] }
+  | { type: "operation:error"; id: string; error: GraphQLError[] }
+  | { type: "operation:complete"; id: string; duration: number }
+  | { type: "cache:update"; entries: CacheEntry[] }
+  | { type: "cache:evict"; keys: string[] };
+
+// Hook into client events
+client.on("operation:start", (op) => {
+  window.postMessage({ type: "bgql:event", payload: op }, "*");
+});
+```
+
+## 14. Summary
 
 Better GraphQL client SDK design ensures:
 
@@ -3159,3 +3380,5 @@ Better GraphQL client SDK design ensures:
 | `using` disposable | Automatic subscription cleanup |
 | Switch-based patterns | Native exhaustive case handling |
 | Vue composables | Fully reactive queries, mutations, subscriptions |
+| Browser DevTools | Visual debugging for streaming and cache |
+| Structured logging | Distributed trace context for observability |
