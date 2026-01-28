@@ -1,0 +1,505 @@
+//! Command-line interface for Better GraphQL.
+//!
+//! # Usage
+//!
+//! ```bash
+//! # Validate a schema
+//! bgql check schema.bgql
+//!
+//! # Format files
+//! bgql fmt schema.bgql
+//!
+//! # Generate TypeScript types
+//! bgql codegen --lang typescript schema.bgql
+//!
+//! # Start the language server
+//! bgql lsp
+//! ```
+
+use bgql_core::Interner;
+use bgql_syntax::{parse, FormatOptions};
+use clap::{Parser, Subcommand};
+use colored::Colorize;
+use std::path::{Path, PathBuf};
+
+#[derive(Parser, Debug)]
+#[command(name = "bgql")]
+#[command(author, version, about, long_about = None)]
+pub struct Cli {
+    #[arg(short, long, global = true)]
+    pub verbose: bool,
+
+    #[arg(short, long, global = true)]
+    pub quiet: bool,
+
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Check GraphQL files for errors
+    Check {
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+
+        #[arg(long)]
+        strict: bool,
+    },
+
+    /// Format GraphQL files
+    #[command(alias = "format")]
+    Fmt {
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+
+        #[arg(long)]
+        check: bool,
+
+        #[arg(long, default_value = "2")]
+        indent: usize,
+
+        #[arg(long)]
+        tabs: bool,
+    },
+
+    /// Generate code from GraphQL schema
+    Codegen {
+        #[arg(required = true)]
+        schema: PathBuf,
+
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        #[arg(short, long, default_value = "typescript")]
+        lang: String,
+    },
+
+    /// Start the language server
+    Lsp,
+
+    /// Parse a GraphQL file and print the AST
+    Parse {
+        file: PathBuf,
+
+        #[arg(long, default_value = "pretty")]
+        format: String,
+    },
+
+    /// Print version information
+    Version,
+}
+
+pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
+    match cli.command {
+        Commands::Check { files, strict } => check_files(&files, strict, cli.verbose),
+        Commands::Fmt {
+            files,
+            check,
+            indent,
+            tabs,
+        } => format_files(&files, check, indent, tabs, cli.verbose),
+        Commands::Codegen {
+            schema,
+            output,
+            lang,
+        } => generate_code(&schema, output.as_ref(), &lang),
+        Commands::Lsp => {
+            // Handled in main.rs
+            Ok(0)
+        }
+        Commands::Parse { file, format } => parse_file(&file, &format),
+        Commands::Version => {
+            println!("bgql {}", env!("CARGO_PKG_VERSION"));
+            Ok(0)
+        }
+    }
+}
+
+fn check_files(
+    files: &[PathBuf],
+    _strict: bool,
+    verbose: bool,
+) -> Result<i32, Box<dyn std::error::Error>> {
+    let mut has_errors = false;
+
+    for file in files {
+        if verbose {
+            println!("{} {}", "Checking".blue(), file.display());
+        }
+
+        let source = std::fs::read_to_string(file)?;
+        let interner = Interner::new();
+        let result = parse(&source, &interner);
+
+        if result.diagnostics.has_errors() {
+            has_errors = true;
+            eprintln!("{} {}", "Error".red().bold(), file.display());
+
+            for error in result.diagnostics.errors() {
+                eprintln!("  {} {}", "-->".blue(), error.title);
+                if let Some(msg) = &error.message {
+                    eprintln!("      {}", msg);
+                }
+            }
+        } else if verbose {
+            println!("{} {}", "OK".green(), file.display());
+        }
+    }
+
+    if has_errors {
+        Ok(1)
+    } else {
+        if !files.is_empty() {
+            println!(
+                "{} {} file(s) checked",
+                "Success:".green().bold(),
+                files.len()
+            );
+        }
+        Ok(0)
+    }
+}
+
+fn format_files(
+    files: &[PathBuf],
+    check_only: bool,
+    indent: usize,
+    use_tabs: bool,
+    verbose: bool,
+) -> Result<i32, Box<dyn std::error::Error>> {
+    let mut needs_formatting = false;
+
+    let options = FormatOptions {
+        indent_size: indent,
+        use_tabs,
+        ..Default::default()
+    };
+
+    for file in files {
+        let source = std::fs::read_to_string(file)?;
+        let interner = Interner::new();
+        let result = parse(&source, &interner);
+
+        if result.diagnostics.has_errors() {
+            eprintln!("{} {} - parse error", "Error".red().bold(), file.display());
+            continue;
+        }
+
+        let formatted =
+            bgql_syntax::format_with_options(&result.document, &interner, options.clone());
+
+        if check_only {
+            if source != formatted {
+                needs_formatting = true;
+                println!("{} {}", "Would format".yellow(), file.display());
+            } else if verbose {
+                println!("{} {}", "OK".green(), file.display());
+            }
+        } else if source != formatted {
+            std::fs::write(file, &formatted)?;
+            println!("{} {}", "Formatted".green(), file.display());
+        } else if verbose {
+            println!("{} {}", "Unchanged".dimmed(), file.display());
+        }
+    }
+
+    if check_only && needs_formatting {
+        Ok(1)
+    } else {
+        Ok(0)
+    }
+}
+
+fn generate_code(
+    schema_path: &Path,
+    output: Option<&PathBuf>,
+    lang: &str,
+) -> Result<i32, Box<dyn std::error::Error>> {
+    let source = std::fs::read_to_string(schema_path)?;
+    let interner = Interner::new();
+    let result = parse(&source, &interner);
+
+    if result.diagnostics.has_errors() {
+        eprintln!("{} Parse errors in schema", "Error:".red().bold());
+        for error in result.diagnostics.errors() {
+            eprintln!("  {}", error.title);
+        }
+        return Ok(1);
+    }
+
+    // Generate code based on language
+    let code = match lang.to_lowercase().as_str() {
+        "typescript" | "ts" => generate_typescript(&result.document, &interner),
+        "rust" | "rs" => generate_rust(&result.document, &interner),
+        "go" => generate_go(&result.document, &interner),
+        _ => {
+            eprintln!("{} Unknown language: {}", "Error:".red().bold(), lang);
+            return Ok(1);
+        }
+    };
+
+    match output {
+        Some(path) => {
+            std::fs::write(path, &code)?;
+            println!("{} {}", "Generated".green(), path.display());
+        }
+        None => {
+            println!("{}", code);
+        }
+    }
+
+    Ok(0)
+}
+
+fn generate_typescript(document: &bgql_syntax::Document<'_>, interner: &Interner) -> String {
+    let mut output = String::from("// Generated by Better GraphQL\n\n");
+
+    for def in &document.definitions {
+        if let bgql_syntax::Definition::Type(type_def) = def {
+            match type_def {
+                bgql_syntax::TypeDefinition::Object(obj) => {
+                    output.push_str(&format!(
+                        "export interface {} {{\n",
+                        interner.get(obj.name.value)
+                    ));
+                    for field in &obj.fields {
+                        let ts_type = type_to_typescript(&field.ty, interner);
+                        output.push_str(&format!(
+                            "  {}: {};\n",
+                            interner.get(field.name.value),
+                            ts_type
+                        ));
+                    }
+                    output.push_str("}\n\n");
+                }
+                bgql_syntax::TypeDefinition::Enum(e) => {
+                    let values: Vec<_> = e
+                        .values
+                        .iter()
+                        .map(|v| format!("\"{}\"", interner.get(v.name.value)))
+                        .collect();
+                    output.push_str(&format!(
+                        "export type {} = {};\n\n",
+                        interner.get(e.name.value),
+                        values.join(" | ")
+                    ));
+                }
+                bgql_syntax::TypeDefinition::Input(inp) => {
+                    output.push_str(&format!(
+                        "export interface {} {{\n",
+                        interner.get(inp.name.value)
+                    ));
+                    for field in &inp.fields {
+                        let ts_type = type_to_typescript(&field.ty, interner);
+                        output.push_str(&format!(
+                            "  {}: {};\n",
+                            interner.get(field.name.value),
+                            ts_type
+                        ));
+                    }
+                    output.push_str("}\n\n");
+                }
+                _ => {}
+            }
+        }
+    }
+
+    output
+}
+
+fn type_to_typescript(ty: &bgql_syntax::Type<'_>, interner: &Interner) -> String {
+    match ty {
+        bgql_syntax::Type::Named(named) => {
+            let name = interner.get(named.name);
+            match name.as_str() {
+                "Int" | "Float" => "number".to_string(),
+                "String" | "ID" => "string".to_string(),
+                "Boolean" => "boolean".to_string(),
+                other => other.to_string(),
+            }
+        }
+        bgql_syntax::Type::Option(inner, _) => {
+            format!("{} | null", type_to_typescript(inner, interner))
+        }
+        bgql_syntax::Type::List(inner, _) => {
+            format!("Array<{}>", type_to_typescript(inner, interner))
+        }
+        bgql_syntax::Type::Generic(gen) => {
+            let name = interner.get(gen.name);
+            let args: Vec<_> = gen
+                .arguments
+                .iter()
+                .map(|a| type_to_typescript(a, interner))
+                .collect();
+            format!("{}<{}>", name, args.join(", "))
+        }
+        _ => "unknown".to_string(),
+    }
+}
+
+fn generate_rust(document: &bgql_syntax::Document<'_>, interner: &Interner) -> String {
+    let mut output =
+        String::from("// Generated by Better GraphQL\n\nuse serde::{Deserialize, Serialize};\n\n");
+
+    for def in &document.definitions {
+        if let bgql_syntax::Definition::Type(type_def) = def {
+            match type_def {
+                bgql_syntax::TypeDefinition::Object(obj) => {
+                    output.push_str("#[derive(Debug, Clone, Serialize, Deserialize)]\n");
+                    output.push_str(&format!("pub struct {} {{\n", interner.get(obj.name.value)));
+                    for field in &obj.fields {
+                        let rs_type = type_to_rust(&field.ty, interner);
+                        output.push_str(&format!(
+                            "    pub {}: {},\n",
+                            interner.get(field.name.value),
+                            rs_type
+                        ));
+                    }
+                    output.push_str("}\n\n");
+                }
+                bgql_syntax::TypeDefinition::Enum(e) => {
+                    output.push_str(
+                        "#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]\n",
+                    );
+                    output.push_str(&format!("pub enum {} {{\n", interner.get(e.name.value)));
+                    for value in &e.values {
+                        output.push_str(&format!("    {},\n", interner.get(value.name.value)));
+                    }
+                    output.push_str("}\n\n");
+                }
+                _ => {}
+            }
+        }
+    }
+
+    output
+}
+
+fn type_to_rust(ty: &bgql_syntax::Type<'_>, interner: &Interner) -> String {
+    match ty {
+        bgql_syntax::Type::Named(named) => {
+            let name = interner.get(named.name);
+            match name.as_str() {
+                "Int" => "i32".to_string(),
+                "Float" => "f64".to_string(),
+                "String" | "ID" => "String".to_string(),
+                "Boolean" => "bool".to_string(),
+                other => other.to_string(),
+            }
+        }
+        bgql_syntax::Type::Option(inner, _) => {
+            format!("Option<{}>", type_to_rust(inner, interner))
+        }
+        bgql_syntax::Type::List(inner, _) => {
+            format!("Vec<{}>", type_to_rust(inner, interner))
+        }
+        _ => "()".to_string(),
+    }
+}
+
+fn generate_go(document: &bgql_syntax::Document<'_>, interner: &Interner) -> String {
+    let mut output = String::from("// Generated by Better GraphQL\n\npackage bgql\n\n");
+
+    for def in &document.definitions {
+        if let bgql_syntax::Definition::Type(type_def) = def {
+            match type_def {
+                bgql_syntax::TypeDefinition::Object(obj) => {
+                    output.push_str(&format!(
+                        "type {} struct {{\n",
+                        interner.get(obj.name.value)
+                    ));
+                    for field in &obj.fields {
+                        let go_type = type_to_go(&field.ty, interner);
+                        let field_name = capitalize(&interner.get(field.name.value));
+                        output.push_str(&format!(
+                            "\t{} {} `json:\"{}\"`\n",
+                            field_name,
+                            go_type,
+                            interner.get(field.name.value)
+                        ));
+                    }
+                    output.push_str("}\n\n");
+                }
+                bgql_syntax::TypeDefinition::Enum(e) => {
+                    let name = interner.get(e.name.value);
+                    output.push_str(&format!("type {} string\n\nconst (\n", name));
+                    for value in &e.values {
+                        let val = interner.get(value.name.value);
+                        output.push_str(&format!("\t{}_{} {} = \"{}\"\n", name, val, name, val));
+                    }
+                    output.push_str(")\n\n");
+                }
+                _ => {}
+            }
+        }
+    }
+
+    output
+}
+
+fn type_to_go(ty: &bgql_syntax::Type<'_>, interner: &Interner) -> String {
+    match ty {
+        bgql_syntax::Type::Named(named) => {
+            let name = interner.get(named.name);
+            match name.as_str() {
+                "Int" => "int".to_string(),
+                "Float" => "float64".to_string(),
+                "String" | "ID" => "string".to_string(),
+                "Boolean" => "bool".to_string(),
+                other => other.to_string(),
+            }
+        }
+        bgql_syntax::Type::Option(inner, _) => {
+            format!("*{}", type_to_go(inner, interner))
+        }
+        bgql_syntax::Type::List(inner, _) => {
+            format!("[]{}", type_to_go(inner, interner))
+        }
+        _ => "interface{}".to_string(),
+    }
+}
+
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+fn parse_file(file: &Path, fmt: &str) -> Result<i32, Box<dyn std::error::Error>> {
+    let source = std::fs::read_to_string(file)?;
+    let interner = Interner::new();
+    let result = parse(&source, &interner);
+
+    if result.diagnostics.has_errors() {
+        eprintln!("{} Parse failed", "Error:".red().bold());
+        for error in result.diagnostics.errors() {
+            eprintln!("  {}", error.title);
+        }
+        return Ok(1);
+    }
+
+    match fmt {
+        "json" => {
+            println!("JSON output not yet implemented");
+        }
+        _ => {
+            println!("{:#?}", result.document);
+        }
+    }
+
+    Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cli_parse() {
+        use clap::CommandFactory;
+        Cli::command().debug_assert();
+    }
+}

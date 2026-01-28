@@ -1,0 +1,25 @@
+[package]
+name = "bgql_sdk"
+description = "SDK for Better GraphQL (Rust client/server, TypeScript/Go codegen)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bgql_core.workspace = true
+bgql_syntax.workspace = true
+bgql_semantic.workspace = true
+bgql_resolver.workspace = true
+bgql_runtime.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+rustc-hash.workspace = true
+
+[dev-dependencies]
+
+[features]
+default = []

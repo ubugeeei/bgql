@@ -1,0 +1,20 @@
+[package]
+name = "bgql_syntax"
+description = "Syntax layer for Better GraphQL (lexer, parser, AST)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bgql_core.workspace = true
+memchr.workspace = true
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+insta.workspace = true
+
+[features]
+default = []
+serde = ["dep:serde", "bgql_core/serde"]

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>bgql DevTools</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      background: #1e1e1e;
+      color: #cccccc;
+      width: 300px;
+      padding: 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #3c3c3c;
+    }
+
+    .logo {
+      font-size: 24px;
+    }
+
+    .title {
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .version {
+      font-size: 11px;
+      color: #9d9d9d;
+      margin-left: auto;
+    }
+
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #2d2d30;
+    }
+
+    .stat-label {
+      color: #9d9d9d;
+    }
+
+    .stat-value {
+      font-weight: 500;
+      color: #6fbf73;
+    }
+
+    .actions {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 10px 16px;
+      background: #2d2d30;
+      border: 1px solid #3c3c3c;
+      color: #cccccc;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: #3c3c3c;
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      color: white;
+    }
+
+    .btn.primary:hover {
+      opacity: 0.9;
+    }
+
+    .footer {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #3c3c3c;
+      font-size: 11px;
+      color: #9d9d9d;
+      text-align: center;
+    }
+
+    .footer a {
+      color: #6fbf73;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="logo">⚡</span>
+    <span class="title">bgql DevTools</span>
+    <span class="version">v0.1.0</span>
+  </div>
+
+  <div class="stat">
+    <span class="stat-label">Queries captured</span>
+    <span class="stat-value" id="queryCount">0</span>
+  </div>
+
+  <div class="stat">
+    <span class="stat-label">Errors detected</span>
+    <span class="stat-value" id="errorCount" style="color: #f44747;">0</span>
+  </div>
+
+  <div class="actions">
+    <a class="btn primary" href="#" id="openDevTools">Open in DevTools</a>
+    <a class="btn" href="https://github.com/ubugeeei/bgql" target="_blank">Documentation</a>
+  </div>
+
+  <div class="footer">
+    Made with 💚 by <a href="https://github.com/ubugeeei" target="_blank">ubugeeei</a>
+  </div>
+
+  <script src="src/popup.js"></script>
+</body>
+</html>

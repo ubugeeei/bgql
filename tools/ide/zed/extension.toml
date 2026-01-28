@@ -1,0 +1,16 @@
+[extension]
+id = "bgql"
+name = "Better GraphQL"
+version = "0.1.0"
+schema_version = 1
+authors = ["ubugeeei <ubugeeei@gmail.com>"]
+description = "Better GraphQL language support for Zed"
+repository = "https://github.com/ubugeeei/bgql"
+
+[language_servers.bgql]
+name = "bgql"
+languages = ["Better GraphQL"]
+
+[grammars.bgql]
+repository = "https://github.com/ubugeeei/tree-sitter-bgql"
+commit = "main"
