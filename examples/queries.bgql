@@ -1,0 +1,538 @@
+# Better GraphQL Query Examples
+# File extension: .bgql
+
+# =============================================================================
+# Basic Queries
+# =============================================================================
+
+# Simple query - shorthand syntax (no operation name, no variables)
+{
+  me {
+    id
+    name
+    email
+  }
+}
+
+# Named query
+query GetCurrentUser {
+  me {
+    id
+    name
+    email
+    avatarUrl
+    role
+  }
+}
+
+# Query with variables
+query GetUser($id: UserId) {
+  user(id: $id) {
+    ... on User {
+      id
+      name
+      email
+      bio
+      createdAt
+    }
+    ... on NotFoundError {
+      message
+      resourceId
+    }
+    ... on UnauthorizedError {
+      message
+    }
+  }
+}
+
+# =============================================================================
+# Queries with Arguments
+# =============================================================================
+
+query GetUsers($first: Int = 10, $filter: Option<UserFilter>) {
+  users(first: $first, filter: $filter) {
+    edges {
+      cursor
+      node {
+        id
+        name
+        email
+        role
+        isVerified
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}
+
+query GetPosts(
+  $first: Int = 20,
+  $status: Option<PostStatus>,
+  $orderBy: PostOrderBy = PublishedAtDesc
+) {
+  posts(
+    first: $first,
+    filter: { status: $status },
+    orderBy: $orderBy
+  ) {
+    edges {
+      node {
+        id
+        title
+        slug
+        excerpt
+        publishedAt
+        author {
+          id
+          name
+          avatarUrl
+        }
+        likesCount
+        commentsCount
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+# =============================================================================
+# Using Aliases
+# =============================================================================
+
+query GetMultipleUsers {
+  admin: user(id: "admin_1") {
+    ... on User {
+      name
+      role
+    }
+    ... on NotFoundError {
+      message
+    }
+  }
+  moderator: user(id: "mod_1") {
+    ... on User {
+      name
+      role
+    }
+    ... on NotFoundError {
+      message
+    }
+  }
+}
+
+query GetPostsByCategory {
+  recentPosts: posts(first: 5, orderBy: PublishedAtDesc) {
+    edges {
+      node {
+        title
+        publishedAt
+      }
+    }
+  }
+  popularPosts: posts(first: 5, orderBy: LikesDesc) {
+    edges {
+      node {
+        title
+        likesCount
+      }
+    }
+  }
+  trendingPosts: posts(first: 5, orderBy: ViewsDesc) {
+    edges {
+      node {
+        title
+        viewsCount
+      }
+    }
+  }
+}
+
+# =============================================================================
+# Using Fragments (Client-side)
+# =============================================================================
+
+fragment UserBasicInfo on User {
+  id
+  name
+  avatarUrl
+}
+
+fragment UserDetailInfo on User {
+  ...UserBasicInfo
+  email
+  bio
+  role
+  isVerified
+  createdAt
+  followersCount
+  followingCount
+}
+
+fragment PostPreviewInfo on Post {
+  id
+  title
+  slug
+  excerpt
+  publishedAt
+  author {
+    ...UserBasicInfo
+  }
+  likesCount
+  commentsCount
+}
+
+query GetUserWithDetails($id: UserId) {
+  user(id: $id) {
+    ... on User {
+      ...UserDetailInfo
+      posts(first: 5) {
+        edges {
+          node {
+            ...PostPreviewInfo
+          }
+        }
+      }
+    }
+    ... on NotFoundError {
+      message
+    }
+  }
+}
+
+# =============================================================================
+# Using Server-side Fragments
+# =============================================================================
+
+# Using @use directive
+query GetUserProfile($id: UserId) {
+  user(id: $id) {
+    ... on User @use(fragment: "UserProfile") {
+      # UserProfile fragment fields are included
+    }
+    ... on NotFoundError {
+      message
+      resourceId
+    }
+  }
+}
+
+# Shorthand syntax for server-side fragments
+query GetPostWithPreview($slug: String) {
+  postBySlug(slug: $slug) {
+    ... on Post {
+      ...@PostFull
+      comments(first: 10) {
+        edges {
+          node {
+            id
+            content
+            author {
+              ...@UserBasic
+            }
+            createdAt
+          }
+        }
+      }
+    }
+    ... on NotFoundError {
+      message
+    }
+  }
+}
+
+# =============================================================================
+# Using Directives
+# =============================================================================
+
+# @include and @skip
+query GetUser($id: UserId, $includeEmail: Boolean!, $hideStats: Boolean!) {
+  user(id: $id) {
+    ... on User {
+      id
+      name
+      email @include(if: $includeEmail)
+      bio
+      followersCount @skip(if: $hideStats)
+      followingCount @skip(if: $hideStats)
+      postsCount @skip(if: $hideStats)
+    }
+    ... on NotFoundError {
+      message
+    }
+  }
+}
+
+# @defer for streaming
+query GetUserWithDeferredContent($id: UserId) {
+  user(id: $id) {
+    ... on User {
+      id
+      name
+      avatarUrl
+
+      # Profile info loads second
+      ... @defer(label: "profile", priority: 1) {
+        bio
+        isVerified
+        createdAt
+      }
+
+      # Stats load third
+      ... @defer(label: "stats", priority: 2) {
+        followersCount
+        followingCount
+        postsCount
+      }
+
+      # Posts load last
+      ... @defer(label: "posts", priority: 3) {
+        posts(first: 5) {
+          edges {
+            node {
+              id
+              title
+              publishedAt
+            }
+          }
+        }
+      }
+    }
+    ... on NotFoundError {
+      message
+    }
+  }
+}
+
+# @stream for list streaming
+query GetTimeline {
+  me {
+    id
+    name
+  }
+
+  posts(first: 50) @stream(initialCount: 10, priority: 1) {
+    edges {
+      node {
+        id
+        title
+        excerpt
+        publishedAt
+        author {
+          id
+          name
+          avatarUrl
+        }
+        # Defer heavy content within streamed items
+        ... @defer(priority: 2) {
+          likesCount
+          commentsCount
+        }
+      }
+    }
+  }
+}
+
+# Combined streaming
+query GetUserFeed($userId: UserId) {
+  user(id: $userId) {
+    ... on User {
+      id
+      name
+
+      posts @stream(initialCount: 3, label: "posts") {
+        edges {
+          node {
+            id
+            title
+
+            comments(first: 3) @stream(initialCount: 1, label: "comments") {
+              edges {
+                node {
+                  id
+                  content
+                  author {
+                    name
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# =============================================================================
+# Search and Union Types
+# =============================================================================
+
+query Search($query: String, $first: Int = 20) {
+  search(query: $query, first: $first) {
+    __typename
+    ... on User {
+      id
+      name
+      avatarUrl
+      bio
+    }
+    ... on Post {
+      id
+      title
+      excerpt
+      publishedAt
+      author {
+        name
+      }
+    }
+    ... on Comment {
+      id
+      content
+      post {
+        title
+      }
+    }
+    ... on Tag {
+      id
+      name
+      postsCount
+    }
+  }
+}
+
+# =============================================================================
+# Nested Queries with Pagination
+# =============================================================================
+
+query GetUserWithPaginatedContent(
+  $userId: UserId,
+  $postsFirst: Int = 10,
+  $postsAfter: Option<String>,
+  $commentsFirst: Int = 5
+) {
+  user(id: $userId) {
+    ... on User {
+      id
+      name
+
+      posts(first: $postsFirst, after: $postsAfter) {
+        edges {
+          cursor
+          node {
+            id
+            title
+            publishedAt
+
+            comments(first: $commentsFirst) {
+              edges {
+                node {
+                  id
+                  content
+                  author {
+                    id
+                    name
+                  }
+                  createdAt
+                }
+              }
+              pageInfo {
+                hasNextPage
+              }
+              totalCount
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          hasPreviousPage
+          startCursor
+          endCursor
+        }
+        totalCount
+      }
+    }
+    ... on NotFoundError {
+      message
+    }
+  }
+}
+
+# =============================================================================
+# Introspection Queries
+# =============================================================================
+
+query GetSchemaTypes {
+  __schema {
+    types {
+      name
+      kind
+      description
+    }
+  }
+}
+
+query GetTypeInfo($typeName: String!) {
+  __type(name: $typeName) {
+    name
+    kind
+    description
+    fields {
+      name
+      type {
+        name
+        kind
+        ofType {
+          name
+          kind
+        }
+      }
+      args {
+        name
+        type {
+          name
+        }
+        defaultValue
+      }
+    }
+  }
+}
+
+# Better GraphQL extension: Get validation rules
+query GetInputValidation($typeName: String!) {
+  __type(name: $typeName) {
+    name
+    inputFields {
+      name
+      type {
+        name
+      }
+      validationRules {
+        name
+        params
+        message
+      }
+    }
+  }
+}
+
+# Better GraphQL extension: Get server fragments
+query GetServerFragments {
+  __schema {
+    serverFragments {
+      name
+      description
+      version
+      onType {
+        name
+      }
+      isDeprecated
+    }
+  }
+}

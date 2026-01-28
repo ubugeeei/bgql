@@ -1,0 +1,577 @@
+# Better GraphQL Schema Example
+# File extension: .bgql
+
+# =============================================================================
+# Schema Configuration
+# =============================================================================
+
+schema
+  @cors(
+    origins: ["https://app.example.com", "https://admin.example.com"],
+    credentials: true,
+    allowHeaders: ["Authorization", "Content-Type", "X-Request-ID"],
+    exposeHeaders: ["X-RateLimit-Remaining", "X-RateLimit-Reset"],
+    maxAge: 86400
+  )
+  @rateLimit(requests: 1000, window: "1h")
+{
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+# =============================================================================
+# Newtypes (Nominal Types for Type Safety)
+# =============================================================================
+
+newtype UserId = ID
+newtype PostId = ID
+newtype CommentId = ID
+newtype TagId = ID
+
+newtype EmailAddress = String @email
+newtype PasswordHash = String
+
+# =============================================================================
+# Interfaces
+# =============================================================================
+
+"""Node interface for Relay-style pagination"""
+interface Node {
+  id: ID
+}
+
+"""Timestamp interface for auditable entities"""
+interface Timestamped {
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+}
+
+"""Base error interface"""
+interface Error {
+  message: String
+  code: String
+}
+
+"""Marker interfaces"""
+interface Serializable {}
+interface Cacheable {}
+
+# =============================================================================
+# Enum Types (PascalCase)
+# =============================================================================
+
+enum UserRole {
+  Admin
+  Moderator
+  User
+  Guest
+}
+
+enum PostStatus {
+  Draft
+  Published
+  Archived @deprecated(reason: "Use Hidden instead")
+  Hidden
+}
+
+enum SortDirection {
+  Asc
+  Desc
+}
+
+enum OAuthProvider {
+  Google
+  Github
+  Twitter
+  Facebook
+}
+
+enum CacheScope {
+  Public
+  Private
+}
+
+enum SameSite {
+  Strict
+  Lax
+  None
+}
+
+# =============================================================================
+# Error Types
+# =============================================================================
+
+type NotFoundError implements Error {
+  message: String
+  code: String  # "NotFound"
+  resourceType: String
+  resourceId: ID
+}
+
+type ValidationError implements Error {
+  message: String
+  code: String  # "ValidationError"
+  field: String
+  constraint: String
+}
+
+type UnauthorizedError implements Error {
+  message: String
+  code: String  # "Unauthorized"
+}
+
+type ForbiddenError implements Error {
+  message: String
+  code: String  # "Forbidden"
+  requiredPermission: String
+}
+
+type EmailAlreadyExistsError implements Error {
+  message: String
+  code: String  # "EmailAlreadyExists"
+  existingEmail: String
+}
+
+type WeakPasswordError implements Error {
+  message: String
+  code: String  # "WeakPassword"
+  requirements: List<String>
+}
+
+type RateLimitError implements Error {
+  message: String
+  code: String  # "RateLimitExceeded"
+  retryAfter: Int
+}
+
+# =============================================================================
+# Object Types
+# =============================================================================
+
+"""User account"""
+type User implements Node & Timestamped & Serializable & Cacheable {
+  id: UserId
+  email: EmailAddress @requireAuth
+  name: String
+  avatarUrl: Option<String>
+  bio: Option<String>
+  role: UserRole
+  isVerified: Boolean
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+
+  # Relations
+  posts(first: Int = 10, after: Option<String>): PostConnection
+  followers(first: Int = 10): UserConnection
+  following(first: Int = 10): UserConnection
+
+  # Computed fields
+  postsCount: Int
+  followersCount: Int
+  followingCount: Int
+}
+
+"""Blog post"""
+type Post implements Node & Timestamped & Serializable {
+  id: PostId
+  title: String
+  slug: String
+  content: HTML
+  excerpt: Option<String>
+  status: PostStatus
+  publishedAt: Option<DateTime>
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+
+  # Relations
+  author: User
+  authorId: UserId
+  tags: List<Tag>
+  comments(first: Int = 10): CommentConnection
+
+  # Computed fields
+  commentsCount: Int
+  likesCount: Int
+  viewsCount: Int
+}
+
+"""Post comment"""
+type Comment implements Node & Timestamped {
+  id: CommentId
+  content: HTML
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+
+  # Relations
+  author: User
+  authorId: UserId
+  post: Post
+  postId: PostId
+  parent: Option<Comment>
+  parentId: Option<CommentId>
+  replies(first: Int = 5): CommentConnection
+}
+
+"""Content tag"""
+type Tag implements Node {
+  id: TagId
+  name: String
+  slug: String
+  description: Option<String>
+  postsCount: Int
+}
+
+# =============================================================================
+# Connection Types (Generic)
+# =============================================================================
+
+type PageInfo {
+  hasNextPage: Boolean
+  hasPreviousPage: Boolean
+  startCursor: Option<String>
+  endCursor: Option<String>
+}
+
+type Edge<T> {
+  cursor: String
+  node: T
+}
+
+type Connection<T extends Node> {
+  edges: List<Edge<T>>
+  pageInfo: PageInfo
+  totalCount: Uint
+}
+
+# Type aliases for convenience
+type alias UserEdge = Edge<User>
+type alias UserConnection = Connection<User>
+type alias PostEdge = Edge<Post>
+type alias PostConnection = Connection<Post>
+type alias CommentEdge = Edge<Comment>
+type alias CommentConnection = Connection<Comment>
+
+# =============================================================================
+# Input Types
+# =============================================================================
+
+input CreateUserInput {
+  email: String @email
+  password: String @minLength(8) @pattern(regex: "^(?=.*[A-Za-z])(?=.*\\d).+$")
+  name: String @minLength(1) @maxLength(100) @trim
+  role: UserRole = User
+}
+
+input UpdateUserInput {
+  name: Option<String> @minLength(1) @maxLength(100) @trim
+  bio: Option<String> @maxLength(500)
+  avatarUrl: Option<String> @url
+}
+
+input CreatePostInput {
+  title: String @minLength(1) @maxLength(200) @trim
+  content: HTML @sanitize(allowTags: ["p", "br", "b", "i", "a", "ul", "ol", "li", "h2", "h3", "blockquote", "pre", "code"])
+  excerpt: Option<String> @maxLength(500)
+  tags: List<TagId> @maxItems(10)
+  status: PostStatus = Draft
+}
+
+input UpdatePostInput {
+  title: Option<String> @minLength(1) @maxLength(200) @trim
+  content: Option<HTML>
+  excerpt: Option<String> @maxLength(500)
+  tags: Option<List<TagId>> @maxItems(10)
+  status: Option<PostStatus>
+}
+
+input CreateCommentInput {
+  postId: PostId
+  content: HTML @sanitize(allowTags: ["p", "br", "b", "i", "a"])
+  parentId: Option<CommentId>
+}
+
+# Input Union for authentication
+input EmailCredentials {
+  email: String @email
+  password: String @minLength(8)
+}
+
+input OAuthCredentials {
+  provider: OAuthProvider
+  token: String
+}
+
+input union LoginCredentials = EmailCredentials | OAuthCredentials
+
+# Filter inputs
+input UserFilter {
+  role: Option<UserRole>
+  isVerified: Option<Boolean>
+  search: Option<String> @maxLength(100)
+}
+
+input PostFilter {
+  status: Option<PostStatus>
+  authorId: Option<UserId>
+  tagIds: Option<List<TagId>>
+  search: Option<String> @maxLength(100)
+}
+
+# =============================================================================
+# Result Types (Union with Error Types)
+# =============================================================================
+
+union UserResult = User | NotFoundError | UnauthorizedError
+union CreateUserResult = User | ValidationError | EmailAlreadyExistsError | WeakPasswordError
+union UpdateUserResult = User | NotFoundError | ValidationError | ForbiddenError
+union DeleteUserResult = DeleteSuccess | NotFoundError | ForbiddenError
+
+union PostResult = Post | NotFoundError
+union CreatePostResult = Post | ValidationError | UnauthorizedError
+union UpdatePostResult = Post | NotFoundError | ValidationError | ForbiddenError
+union DeletePostResult = DeleteSuccess | NotFoundError | ForbiddenError
+
+union CreateCommentResult = Comment | ValidationError | UnauthorizedError | NotFoundError
+
+union LoginResult = AuthPayload | ValidationError | UnauthorizedError | RateLimitError
+union LogoutResult = LogoutSuccess | UnauthorizedError
+
+type DeleteSuccess {
+  success: Boolean
+  deletedId: ID
+}
+
+type LogoutSuccess {
+  success: Boolean
+}
+
+type AuthPayload {
+  user: User
+  accessToken: String
+  refreshToken: String
+  expiresAt: DateTime
+}
+
+# =============================================================================
+# Query Type
+# =============================================================================
+
+type Query {
+  # User queries
+  me @requireAuth @cookie(name: "session"): Option<User>
+
+  user(id: UserId): UserResult
+
+  users(
+    first: Int = 10 @min(1) @max(100),
+    after: Option<String>,
+    filter: Option<UserFilter>,
+    orderBy: UserOrderBy = CreatedAtDesc
+  ): UserConnection @cache(maxAge: 60, scope: Private)
+
+  # Post queries
+  post(id: PostId): PostResult
+  postBySlug(slug: String): PostResult
+
+  posts(
+    first: Int = 10 @min(1) @max(100),
+    after: Option<String>,
+    filter: Option<PostFilter>,
+    orderBy: PostOrderBy = CreatedAtDesc
+  ): PostConnection @cache(maxAge: 300, scope: Public)
+
+  popularPosts(first: Int = 10): List<Post> @cache(maxAge: 3600, scope: Public)
+
+  # Search
+  search(query: String @minLength(2), first: Int = 20): List<SearchResult>
+
+  # Tags
+  tags(first: Int = 50): List<Tag> @cache(maxAge: 3600, scope: Public)
+  tag(slug: String): Option<Tag>
+}
+
+union SearchResult = User | Post | Comment | Tag
+
+enum UserOrderBy {
+  CreatedAtAsc
+  CreatedAtDesc
+  NameAsc
+  NameDesc
+  FollowersCountDesc
+}
+
+enum PostOrderBy {
+  CreatedAtAsc
+  CreatedAtDesc
+  PublishedAtDesc
+  LikesDesc
+  ViewsDesc
+}
+
+# =============================================================================
+# Mutation Type
+# =============================================================================
+
+type Mutation {
+  # Auth mutations
+  login(credentials: LoginCredentials): LoginResult
+    @cookie(name: "session", options: {
+      maxAge: 604800,
+      httpOnly: true,
+      secure: true,
+      sameSite: Strict
+    })
+
+  logout: LogoutResult
+    @requireAuth
+    @cookie(name: "session", options: { maxAge: 0 })
+
+  refreshToken: AuthPayload @requireAuth
+
+  # User mutations
+  createUser(input: CreateUserInput): CreateUserResult
+  updateUser(input: UpdateUserInput): UpdateUserResult @requireAuth
+  deleteUser: DeleteUserResult @requireAuth
+
+  # Post mutations
+  createPost(input: CreatePostInput): CreatePostResult @requireAuth
+  updatePost(id: PostId, input: UpdatePostInput): UpdatePostResult @requireAuth
+  deletePost(id: PostId): DeletePostResult @requireAuth
+  publishPost(id: PostId): UpdatePostResult @requireAuth
+
+  # Comment mutations
+  createComment(input: CreateCommentInput): CreateCommentResult @requireAuth
+  deleteComment(id: CommentId): DeleteCommentResult @requireAuth
+
+  # Social mutations
+  followUser(userId: UserId): FollowResult @requireAuth
+  unfollowUser(userId: UserId): UnfollowResult @requireAuth
+  likePost(postId: PostId): LikeResult @requireAuth
+  unlikePost(postId: PostId): UnlikeResult @requireAuth
+}
+
+union DeleteCommentResult = DeleteSuccess | NotFoundError | ForbiddenError
+union FollowResult = FollowSuccess | NotFoundError | AlreadyFollowingError
+union UnfollowResult = UnfollowSuccess | NotFoundError | NotFollowingError
+union LikeResult = LikeSuccess | NotFoundError | AlreadyLikedError
+union UnlikeResult = UnlikeSuccess | NotFoundError | NotLikedError
+
+type FollowSuccess { user: User }
+type UnfollowSuccess { success: Boolean }
+type LikeSuccess { post: Post }
+type UnlikeSuccess { success: Boolean }
+
+type AlreadyFollowingError implements Error {
+  message: String
+  code: String
+  userId: UserId
+}
+
+type NotFollowingError implements Error {
+  message: String
+  code: String
+  userId: UserId
+}
+
+type AlreadyLikedError implements Error {
+  message: String
+  code: String
+  postId: PostId
+}
+
+type NotLikedError implements Error {
+  message: String
+  code: String
+  postId: PostId
+}
+
+# =============================================================================
+# Subscription Type
+# =============================================================================
+
+type Subscription {
+  # User events
+  userCreated: User @requireAuth(roles: ["Admin"])
+  userUpdated(userId: Option<UserId>): User
+
+  # Post events
+  postCreated(authorId: Option<UserId>): Post
+  postUpdated(postId: Option<PostId>): Post
+  postPublished: Post
+
+  # Comment events
+  commentCreated(postId: PostId): Comment
+  commentDeleted(postId: PostId): CommentId
+
+  # Notification events
+  notification: Notification @requireAuth
+}
+
+type Notification {
+  id: ID
+  type: NotificationType
+  message: String
+  createdAt: DateTime
+  read: Boolean
+  data: Option<JSON>
+}
+
+enum NotificationType {
+  NewFollower
+  NewComment
+  NewLike
+  Mention
+  System
+}
+
+# =============================================================================
+# Server-side Fragments
+# =============================================================================
+
+"""Basic user info for lists and cards"""
+fragment UserBasic on User @server {
+  id
+  name
+  avatarUrl
+  isVerified
+}
+
+"""User profile view"""
+fragment UserProfile on User @server {
+  ...UserBasic
+  bio
+  role
+  followersCount
+  followingCount
+  postsCount
+  createdAt
+}
+
+"""Post preview for lists"""
+fragment PostPreview on Post @server {
+  id
+  title
+  slug
+  excerpt
+  author {
+    ...UserBasic
+  }
+  publishedAt
+  likesCount
+  commentsCount
+  tags {
+    id
+    name
+    slug
+  }
+}
+
+"""Full post content"""
+fragment PostFull on Post @server {
+  ...PostPreview
+  content
+  createdAt
+  updatedAt
+  viewsCount
+}

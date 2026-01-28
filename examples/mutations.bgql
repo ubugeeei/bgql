@@ -1,0 +1,540 @@
+# Better GraphQL Mutation Examples
+# File extension: .bgql
+
+# =============================================================================
+# Authentication Mutations
+# =============================================================================
+
+# Login with email credentials
+mutation LoginWithEmail($email: String, $password: String) {
+  login(credentials: {
+    __typename: "EmailCredentials",
+    email: $email,
+    password: $password
+  }) {
+    ... on AuthPayload {
+      user {
+        id
+        name
+        email
+        role
+      }
+      accessToken
+      refreshToken
+      expiresAt
+    }
+    ... on ValidationError {
+      message
+      field
+      constraint
+    }
+    ... on UnauthorizedError {
+      message
+    }
+    ... on RateLimitError {
+      message
+      retryAfter
+    }
+  }
+}
+
+# Login with OAuth
+mutation LoginWithOAuth($provider: OAuthProvider, $token: String) {
+  login(credentials: {
+    __typename: "OAuthCredentials",
+    provider: $provider,
+    token: $token
+  }) {
+    ... on AuthPayload {
+      user {
+        id
+        name
+        email
+      }
+      accessToken
+    }
+    ... on UnauthorizedError {
+      message
+    }
+  }
+}
+
+# Logout
+mutation Logout {
+  logout {
+    ... on LogoutSuccess {
+      success
+    }
+    ... on UnauthorizedError {
+      message
+    }
+  }
+}
+
+# Refresh token
+mutation RefreshToken {
+  refreshToken {
+    accessToken
+    refreshToken
+    expiresAt
+  }
+}
+
+# =============================================================================
+# User Mutations
+# =============================================================================
+
+# Create user (registration)
+mutation CreateUser($input: CreateUserInput) {
+  createUser(input: $input) {
+    ... on User {
+      id
+      name
+      email
+      role
+      createdAt
+    }
+    ... on ValidationError {
+      message
+      field
+      constraint
+    }
+    ... on EmailAlreadyExistsError {
+      message
+      existingEmail
+    }
+    ... on WeakPasswordError {
+      message
+      requirements
+    }
+  }
+}
+
+# Update user profile
+mutation UpdateUser($input: UpdateUserInput) {
+  updateUser(input: $input) {
+    ... on User {
+      id
+      name
+      bio
+      avatarUrl
+      updatedAt
+    }
+    ... on NotFoundError {
+      message
+      resourceId
+    }
+    ... on ValidationError {
+      message
+      field
+    }
+    ... on ForbiddenError {
+      message
+      requiredPermission
+    }
+  }
+}
+
+# Delete user account
+mutation DeleteUser {
+  deleteUser {
+    ... on DeleteSuccess {
+      success
+      deletedId
+    }
+    ... on NotFoundError {
+      message
+    }
+    ... on ForbiddenError {
+      message
+    }
+  }
+}
+
+# =============================================================================
+# Post Mutations
+# =============================================================================
+
+# Create new post
+mutation CreatePost($input: CreatePostInput) {
+  createPost(input: $input) {
+    ... on Post {
+      id
+      title
+      slug
+      content
+      excerpt
+      status
+      createdAt
+      author {
+        id
+        name
+      }
+      tags {
+        id
+        name
+      }
+    }
+    ... on ValidationError {
+      message
+      field
+      constraint
+    }
+    ... on UnauthorizedError {
+      message
+    }
+  }
+}
+
+# Update post
+mutation UpdatePost($id: PostId, $input: UpdatePostInput) {
+  updatePost(id: $id, input: $input) {
+    ... on Post {
+      id
+      title
+      slug
+      content
+      excerpt
+      status
+      updatedAt
+      tags {
+        id
+        name
+      }
+    }
+    ... on NotFoundError {
+      message
+      resourceId
+    }
+    ... on ValidationError {
+      message
+      field
+    }
+    ... on ForbiddenError {
+      message
+    }
+  }
+}
+
+# Publish post
+mutation PublishPost($id: PostId) {
+  publishPost(id: $id) {
+    ... on Post {
+      id
+      title
+      status
+      publishedAt
+    }
+    ... on NotFoundError {
+      message
+    }
+    ... on ForbiddenError {
+      message
+    }
+  }
+}
+
+# Delete post
+mutation DeletePost($id: PostId) {
+  deletePost(id: $id) {
+    ... on DeleteSuccess {
+      success
+      deletedId
+    }
+    ... on NotFoundError {
+      message
+    }
+    ... on ForbiddenError {
+      message
+    }
+  }
+}
+
+# =============================================================================
+# Comment Mutations
+# =============================================================================
+
+# Create comment
+mutation CreateComment($input: CreateCommentInput) {
+  createComment(input: $input) {
+    ... on Comment {
+      id
+      content
+      createdAt
+      author {
+        id
+        name
+        avatarUrl
+      }
+      post {
+        id
+        title
+      }
+      parent {
+        id
+      }
+    }
+    ... on ValidationError {
+      message
+      field
+    }
+    ... on UnauthorizedError {
+      message
+    }
+    ... on NotFoundError {
+      message
+      resourceId
+    }
+  }
+}
+
+# Reply to comment
+mutation ReplyToComment($postId: PostId, $parentId: CommentId, $content: HTML) {
+  createComment(input: {
+    postId: $postId,
+    content: $content,
+    parentId: $parentId
+  }) {
+    ... on Comment {
+      id
+      content
+      author {
+        id
+        name
+      }
+      parent {
+        id
+        author {
+          name
+        }
+      }
+    }
+    ... on ValidationError {
+      message
+      field
+    }
+    ... on NotFoundError {
+      message
+    }
+  }
+}
+
+# Delete comment
+mutation DeleteComment($id: CommentId) {
+  deleteComment(id: $id) {
+    ... on DeleteSuccess {
+      success
+      deletedId
+    }
+    ... on NotFoundError {
+      message
+    }
+    ... on ForbiddenError {
+      message
+    }
+  }
+}
+
+# =============================================================================
+# Social Mutations
+# =============================================================================
+
+# Follow user
+mutation FollowUser($userId: UserId) {
+  followUser(userId: $userId) {
+    ... on FollowSuccess {
+      user {
+        id
+        name
+        followersCount
+      }
+    }
+    ... on NotFoundError {
+      message
+      resourceId
+    }
+    ... on AlreadyFollowingError {
+      message
+      userId
+    }
+  }
+}
+
+# Unfollow user
+mutation UnfollowUser($userId: UserId) {
+  unfollowUser(userId: $userId) {
+    ... on UnfollowSuccess {
+      success
+    }
+    ... on NotFoundError {
+      message
+    }
+    ... on NotFollowingError {
+      message
+      userId
+    }
+  }
+}
+
+# Like post
+mutation LikePost($postId: PostId) {
+  likePost(postId: $postId) {
+    ... on LikeSuccess {
+      post {
+        id
+        title
+        likesCount
+      }
+    }
+    ... on NotFoundError {
+      message
+    }
+    ... on AlreadyLikedError {
+      message
+      postId
+    }
+  }
+}
+
+# Unlike post
+mutation UnlikePost($postId: PostId) {
+  unlikePost(postId: $postId) {
+    ... on UnlikeSuccess {
+      success
+    }
+    ... on NotFoundError {
+      message
+    }
+    ... on NotLikedError {
+      message
+      postId
+    }
+  }
+}
+
+# =============================================================================
+# Batch Mutations (Multiple operations in order)
+# =============================================================================
+
+# Note: Root mutation fields execute in serial order
+mutation CreateUserAndFirstPost(
+  $userInput: CreateUserInput,
+  $postInput: CreatePostInput
+) {
+  # First: Create user
+  createUser(input: $userInput) {
+    ... on User {
+      id
+      name
+    }
+    ... on ValidationError {
+      message
+      field
+    }
+    ... on EmailAlreadyExistsError {
+      message
+    }
+  }
+
+  # Second: Create post (executes after createUser)
+  createPost(input: $postInput) {
+    ... on Post {
+      id
+      title
+      author {
+        id
+        name
+      }
+    }
+    ... on ValidationError {
+      message
+    }
+  }
+}
+
+# =============================================================================
+# Mutations with Optimistic Updates
+# =============================================================================
+
+# Mutation returning enough data for optimistic update
+mutation LikePostOptimistic($postId: PostId) {
+  likePost(postId: $postId) {
+    ... on LikeSuccess {
+      post {
+        id
+        likesCount
+        # Include any fields needed for cache update
+        title
+        author {
+          id
+          name
+        }
+      }
+    }
+    ... on NotFoundError {
+      message
+    }
+    ... on AlreadyLikedError {
+      message
+    }
+  }
+}
+
+# =============================================================================
+# Fragments for Mutation Results
+# =============================================================================
+
+fragment PostMutationResult on Post {
+  id
+  title
+  slug
+  content
+  excerpt
+  status
+  publishedAt
+  updatedAt
+  author {
+    id
+    name
+  }
+  tags {
+    id
+    name
+  }
+  likesCount
+  commentsCount
+}
+
+mutation CreatePostWithFullResult($input: CreatePostInput) {
+  createPost(input: $input) {
+    ... on Post {
+      ...PostMutationResult
+    }
+    ... on ValidationError {
+      message
+      field
+      constraint
+    }
+    ... on UnauthorizedError {
+      message
+    }
+  }
+}
+
+mutation UpdatePostWithFullResult($id: PostId, $input: UpdatePostInput) {
+  updatePost(id: $id, input: $input) {
+    ... on Post {
+      ...PostMutationResult
+    }
+    ... on NotFoundError {
+      message
+    }
+    ... on ValidationError {
+      message
+      field
+    }
+    ... on ForbiddenError {
+      message
+    }
+  }
+}
