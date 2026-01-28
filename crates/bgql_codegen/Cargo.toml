@@ -1,0 +1,19 @@
+[package]
+name = "bgql_codegen"
+description = "Code generation for Better GraphQL SDKs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bgql_core.workspace = true
+bgql_syntax.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+
+[features]
+default = []

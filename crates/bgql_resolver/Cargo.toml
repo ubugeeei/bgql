@@ -1,0 +1,19 @@
+[package]
+name = "bgql_resolver"
+description = "Name resolution for Better GraphQL"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bgql_core.workspace = true
+bgql_syntax.workspace = true
+bgql_semantic.workspace = true
+rustc-hash.workspace = true
+
+[dev-dependencies]
+
+[features]
+default = []

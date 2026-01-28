@@ -1,0 +1,22 @@
+[package]
+name = "bgql_core"
+description = "Core utilities for Better GraphQL (arena, span, text, diagnostics)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bumpalo.workspace = true
+miette.workspace = true
+thiserror.workspace = true
+rustc-hash.workspace = true
+memchr.workspace = true
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+
+[features]
+default = []
+serde = ["dep:serde"]

@@ -1,0 +1,50 @@
+{
+  "name": "@bgql/client",
+  "version": "0.1.0",
+  "description": "Type-safe GraphQL client for bgql schemas",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --dts",
+    "dev": "tsdown src/index.ts --format esm --dts --watch",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --tsconfig tsconfig.json",
+    "lint:fix": "oxlint --tsconfig tsconfig.json --fix",
+    "fmt": "oxfmt --write src",
+    "fmt:check": "oxfmt --check src"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@nicolo-ribaudo/oxfmt": "^0.7.0",
+    "@nicolo-ribaudo/oxlint": "^0.16.0",
+    "@typescript/native-preview": "^7.0.0-dev.20250122",
+    "tsdown": "^0.9.0",
+    "typescript": "^5.3.0",
+    "vitest": "^2.0.0"
+  },
+  "peerDependencies": {},
+  "keywords": [
+    "graphql",
+    "client",
+    "typescript",
+    "bgql"
+  ],
+  "author": "ubugeeei",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ubugeeei/bgql"
+  }
+}
