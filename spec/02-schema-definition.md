@@ -433,33 +433,202 @@ The following identifiers are reserved and cannot be used as type or field names
 - `true`, `false`, `null`
 - `__typename`, `__schema`, `__type` (for introspection)
 
-## 10. File Organization
+## 10. Module System
 
-### 10.1 Recommended Structure
+Better GraphQL uses a Rust-inspired module system with `mod`, `use`, and `pub` keywords for organizing schemas across files.
+
+### 10.1 Visibility
+
+By default, all definitions are private to their module. Use `pub` to make them visible to other modules.
+
+```graphql
+# Private type (only visible within same module)
+type InternalConfig {
+  secret: String
+}
+
+# Public type (visible to other modules)
+pub type User {
+  id: ID
+  name: String
+}
+
+# Public enum
+pub enum UserRole {
+  Admin
+  User
+  Guest
+}
+```
+
+### 10.2 Module Declaration
+
+Use `mod` to declare submodules. Modules can be external (in separate files) or inline.
+
+```graphql
+# External module declaration (loads from users.bgql or users/mod.bgql)
+mod users;
+
+# External module declaration with path
+mod auth;
+mod posts;
+
+# Inline module
+mod helpers {
+  pub type PageInfo {
+    hasNextPage: Boolean
+    hasPreviousPage: Boolean
+    startCursor: Option<String>
+    endCursor: Option<String>
+  }
+}
+
+# Public module (re-exports are visible to parent's importers)
+pub mod common;
+```
+
+### 10.3 Import Syntax (use)
+
+Use `use` to import types from other modules.
+
+```graphql
+# Import specific items
+use::users::{User, UserInput}
+use::posts::Post
+use::common::PageInfo
+
+# Import with alias
+use::external::User as ExternalUser
+
+# Glob import (import all public items)
+use::common::*
+
+# Re-export (make imported items public)
+pub use::users::User
+```
+
+### 10.4 Module Path Resolution
+
+Modules are resolved relative to the current file:
+
+- `mod users;` → `./users.bgql` or `./users/mod.bgql`
+- `use::users::User` → Import `User` from the `users` module
+- `use::users::types::User` → Import `User` from `users/types` submodule
+
+### 10.5 Recommended Structure
 
 ```
 schema/
-├── schema.bgql           # Root definition
-├── types/
-│   ├── user.bgql
-│   ├── post.bgql
-│   └── comment.bgql
-├── inputs/
-│   ├── user.bgql
-│   └── post.bgql
-├── errors/
-│   └── common.bgql
-├── fragments/
-│   └── server-fragments.bgql
+├── mod.bgql              # Root module
+├── users/
+│   ├── mod.bgql          # User module root
+│   ├── types.bgql        # User types
+│   └── inputs.bgql       # User inputs
+├── posts/
+│   ├── mod.bgql
+│   └── types.bgql
+├── common/
+│   ├── mod.bgql
+│   ├── errors.bgql       # Shared error types
+│   └── pagination.bgql   # Pagination types
 └── directives/
-    └── custom.bgql
+    └── mod.bgql          # Custom directives
 ```
 
-### 10.2 Import Syntax
+### 10.6 Root Module Example
 
 ```graphql
-# schema.bgql
-import { User, UserResult } from "./types/user.bgql"
-import { CreateUserInput } from "./inputs/user.bgql"
-import { NotFoundError, ValidationError } from "./errors/common.bgql"
+# mod.bgql (root)
+
+# Declare submodules
+mod users;
+mod posts;
+mod common;
+
+# Import from submodules
+use::users::{User, UserResult}
+use::posts::{Post, PostConnection}
+use::common::{PageInfo, NotFoundError, ValidationError}
+
+# Re-export commonly used types
+pub use::common::PageInfo
+
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Query {
+  user(id: ID): UserResult
+  posts(first: Int, after: Option<String>): PostConnection
+}
+
+type Mutation {
+  createUser(input: CreateUserInput): CreateUserResult
+}
 ```
+
+### 10.7 Submodule Example
+
+```graphql
+# users/mod.bgql
+
+# Declare child modules
+mod types;
+mod inputs;
+
+# Re-export public items
+pub use::types::{User, UserPayload}
+pub use::inputs::{CreateUserInput, UpdateUserInput}
+
+# Import from sibling modules
+use::common::{NotFoundError, ValidationError}
+
+# Define types specific to this module
+pub union UserResult = UserPayload | NotFoundError
+
+pub union CreateUserResult =
+  | UserPayload
+  | ValidationError
+  | EmailAlreadyExistsError
+
+type EmailAlreadyExistsError implements Error {
+  message: String
+  code: String
+  email: String
+}
+```
+
+### 10.8 Types Module Example
+
+```graphql
+# users/types.bgql
+
+use::common::Timestamped
+
+"""
+Represents a user in the system.
+"""
+pub type User implements Node & Timestamped {
+  id: ID
+  name: String
+  email: String @requireAuth
+  avatarUrl: Option<String>
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+}
+
+pub type UserPayload {
+  user: User
+}
+```
+
+### 10.9 Module Visibility Rules
+
+1. **Private by default**: All definitions are private unless marked `pub`
+2. **Public visibility**: `pub` makes a definition visible to parent modules
+3. **Re-exports**: `pub use` makes imported items visible to importers of this module
+4. **Module hierarchy**: A module can only access:
+   - Its own definitions
+   - Public definitions from declared submodules
+   - Items imported via `use`

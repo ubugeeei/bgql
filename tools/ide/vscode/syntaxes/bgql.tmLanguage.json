@@ -1,0 +1,303 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Better GraphQL",
+  "scopeName": "source.bgql",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#description" },
+    { "include": "#directive" },
+    { "include": "#type-definition" },
+    { "include": "#operation" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.bgql",
+      "match": "#.*$"
+    },
+    "description": {
+      "name": "string.quoted.triple.bgql",
+      "begin": "\"\"\"",
+      "end": "\"\"\""
+    },
+    "string": {
+      "name": "string.quoted.double.bgql",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.bgql",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "number": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.bgql",
+          "match": "-?\\d+\\.\\d+([eE][+-]?\\d+)?"
+        },
+        {
+          "name": "constant.numeric.integer.bgql",
+          "match": "-?\\d+"
+        }
+      ]
+    },
+    "boolean": {
+      "name": "constant.language.boolean.bgql",
+      "match": "\\b(true|false)\\b"
+    },
+    "null": {
+      "name": "constant.language.null.bgql",
+      "match": "\\bnull\\b"
+    },
+    "directive": {
+      "name": "meta.directive.bgql",
+      "match": "@([a-zA-Z_][a-zA-Z0-9_]*)",
+      "captures": {
+        "0": { "name": "entity.name.tag.directive.bgql" }
+      }
+    },
+    "variable": {
+      "name": "variable.other.bgql",
+      "match": "\\$([a-zA-Z_][a-zA-Z0-9_]*)"
+    },
+    "type-keyword": {
+      "name": "keyword.other.bgql",
+      "match": "\\b(type|interface|enum|union|input|scalar|opaque|directive|extend|schema|implements|on|repeatable)\\b"
+    },
+    "operation-keyword": {
+      "name": "keyword.control.bgql",
+      "match": "\\b(query|mutation|subscription|fragment)\\b"
+    },
+    "builtin-type": {
+      "name": "support.type.builtin.bgql",
+      "match": "\\b(Int|Float|String|Boolean|ID|DateTime|JSON|Option|List)\\b"
+    },
+    "type-name": {
+      "name": "entity.name.type.bgql",
+      "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+    },
+    "field-name": {
+      "name": "variable.other.property.bgql",
+      "match": "\\b[a-z_][a-zA-Z0-9_]*(?=\\s*[:(])"
+    },
+    "enum-value": {
+      "name": "constant.other.enum.bgql",
+      "match": "\\b[A-Z][A-Z0-9_]*\\b"
+    },
+    "type-definition": {
+      "patterns": [
+        {
+          "name": "meta.type.object.bgql",
+          "begin": "\\b(type)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.bgql" },
+            "2": { "name": "entity.name.type.class.bgql" }
+          },
+          "end": "(?<=\\})",
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#directive" },
+            { "include": "#implements-clause" },
+            { "include": "#type-body" }
+          ]
+        },
+        {
+          "name": "meta.type.interface.bgql",
+          "begin": "\\b(interface)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.bgql" },
+            "2": { "name": "entity.name.type.interface.bgql" }
+          },
+          "end": "(?<=\\})",
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#directive" },
+            { "include": "#type-body" }
+          ]
+        },
+        {
+          "name": "meta.type.enum.bgql",
+          "begin": "\\b(enum)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.bgql" },
+            "2": { "name": "entity.name.type.enum.bgql" }
+          },
+          "end": "(?<=\\})",
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#directive" },
+            { "include": "#enum-body" }
+          ]
+        },
+        {
+          "name": "meta.type.union.bgql",
+          "begin": "\\b(union)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.bgql" },
+            "2": { "name": "entity.name.type.bgql" }
+          },
+          "end": "(?=\\n|#)",
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#type-name" }
+          ]
+        },
+        {
+          "name": "meta.type.input.bgql",
+          "begin": "\\b(input)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.bgql" },
+            "2": { "name": "entity.name.type.bgql" }
+          },
+          "end": "(?<=\\})",
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#directive" },
+            { "include": "#type-body" }
+          ]
+        },
+        {
+          "name": "meta.type.scalar.bgql",
+          "match": "\\b(scalar)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.bgql" },
+            "2": { "name": "entity.name.type.bgql" }
+          }
+        },
+        {
+          "name": "meta.type.opaque.bgql",
+          "match": "\\b(opaque)\\s+([A-Z][a-zA-Z0-9_]*)\\s*=",
+          "captures": {
+            "1": { "name": "keyword.other.bgql" },
+            "2": { "name": "entity.name.type.bgql" }
+          }
+        }
+      ]
+    },
+    "implements-clause": {
+      "begin": "\\b(implements)\\b",
+      "beginCaptures": {
+        "1": { "name": "keyword.other.bgql" }
+      },
+      "end": "(?=\\{)",
+      "patterns": [
+        { "include": "#type-name" }
+      ]
+    },
+    "type-body": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#description" },
+        { "include": "#directive" },
+        { "include": "#field-definition" }
+      ]
+    },
+    "enum-body": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#description" },
+        { "include": "#directive" },
+        { "include": "#enum-value" },
+        { "include": "#type-name" }
+      ]
+    },
+    "field-definition": {
+      "begin": "([a-z_][a-zA-Z0-9_]*)",
+      "beginCaptures": {
+        "1": { "name": "variable.other.property.bgql" }
+      },
+      "end": "(?=[,}]|\\n\\s*[a-z_])",
+      "patterns": [
+        { "include": "#arguments-definition" },
+        { "include": "#type-reference" },
+        { "include": "#directive" }
+      ]
+    },
+    "arguments-definition": {
+      "begin": "\\(",
+      "end": "\\)",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#directive" },
+        { "include": "#argument-definition" }
+      ]
+    },
+    "argument-definition": {
+      "begin": "([a-z_][a-zA-Z0-9_]*)\\s*:",
+      "beginCaptures": {
+        "1": { "name": "variable.parameter.bgql" }
+      },
+      "end": "(?=[,)])",
+      "patterns": [
+        { "include": "#type-reference" },
+        { "include": "#default-value" },
+        { "include": "#directive" }
+      ]
+    },
+    "type-reference": {
+      "patterns": [
+        { "include": "#builtin-type" },
+        {
+          "name": "meta.type.generic.bgql",
+          "begin": "(Option|List)\\s*<",
+          "beginCaptures": {
+            "1": { "name": "support.type.builtin.bgql" }
+          },
+          "end": ">",
+          "patterns": [
+            { "include": "#type-reference" }
+          ]
+        },
+        { "include": "#type-name" }
+      ]
+    },
+    "default-value": {
+      "begin": "=",
+      "end": "(?=[,)@])",
+      "patterns": [
+        { "include": "#string" },
+        { "include": "#number" },
+        { "include": "#boolean" },
+        { "include": "#null" },
+        { "include": "#enum-value" }
+      ]
+    },
+    "operation": {
+      "begin": "\\b(query|mutation|subscription)\\b\\s*([a-zA-Z_][a-zA-Z0-9_]*)?",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.bgql" },
+        "2": { "name": "entity.name.function.bgql" }
+      },
+      "end": "(?<=\\})",
+      "patterns": [
+        { "include": "#variable-definitions" },
+        { "include": "#directive" },
+        { "include": "#selection-set" }
+      ]
+    },
+    "variable-definitions": {
+      "begin": "\\(",
+      "end": "\\)",
+      "patterns": [
+        { "include": "#variable" },
+        { "include": "#type-reference" },
+        { "include": "#default-value" }
+      ]
+    },
+    "selection-set": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#directive" },
+        { "include": "#field-name" },
+        { "include": "#selection-set" }
+      ]
+    }
+  }
+}

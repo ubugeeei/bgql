@@ -1,0 +1,113 @@
+[tools]
+rust = "latest"
+bun = "latest"
+node = "22"
+
+[tasks.check]
+description = "Run cargo check"
+run = "cargo check --workspace --all-features"
+
+[tasks.test]
+description = "Run all tests"
+run = "cargo test --workspace --all-features"
+
+[tasks.clippy]
+description = "Run clippy"
+run = "cargo clippy --workspace --all-features -- -D warnings"
+
+[tasks.fmt]
+description = "Format code"
+run = "cargo fmt --all"
+
+[tasks."fmt:check"]
+description = "Check formatting"
+run = "cargo fmt --all -- --check"
+
+[tasks.doc]
+description = "Build documentation"
+run = "cargo doc --workspace --all-features --no-deps"
+env = { RUSTDOCFLAGS = "-D warnings" }
+
+[tasks.wasm]
+description = "Build WASM package"
+run = "wasm-pack build crates/bgql_wasm --target web"
+
+[tasks.build]
+description = "Build all crates"
+run = "cargo build --workspace --all-features"
+
+[tasks."build:release"]
+description = "Build release"
+run = "cargo build --workspace --all-features --release"
+
+[tasks.ci]
+description = "Run all CI checks"
+depends = ["check", "test", "clippy", "fmt:check", "doc", "wasm"]
+
+# Playground tasks
+[tasks."playground:dev"]
+description = "Run playground dev server"
+dir = "playground"
+run = "bun run dev"
+
+[tasks."playground:build"]
+description = "Build playground"
+dir = "playground"
+run = "bun run build"
+
+[tasks."playground:typecheck"]
+description = "Type check playground"
+dir = "playground"
+run = "bun run typecheck"
+
+[tasks."playground:install"]
+description = "Install playground dependencies"
+dir = "playground"
+run = "bun install"
+
+# NPM packages tasks
+[tasks."npm:install"]
+description = "Install npm package dependencies"
+run = """
+cd npm/client && bun install
+cd ../server && bun install
+"""
+
+[tasks."npm:typecheck"]
+description = "Type check npm packages"
+run = """
+cd npm/client && bun run typecheck
+cd ../server && bun run typecheck
+"""
+
+[tasks."npm:build"]
+description = "Build npm packages"
+run = """
+cd npm/client && bun run build
+cd ../server && bun run build
+"""
+
+# VS Code extension tasks
+[tasks."vscode:install"]
+description = "Install VS Code extension dependencies"
+dir = "tools/ide/vscode"
+run = "bun install"
+
+[tasks."vscode:typecheck"]
+description = "Type check VS Code extension"
+dir = "tools/ide/vscode"
+run = "bun run typecheck"
+
+[tasks."vscode:build"]
+description = "Build VS Code extension"
+dir = "tools/ide/vscode"
+run = "bun run compile"
+
+# All tasks
+[tasks.install]
+description = "Install all dependencies"
+depends = ["playground:install", "npm:install", "vscode:install"]
+
+[tasks.all]
+description = "Run all checks and builds"
+depends = ["ci", "playground:typecheck", "npm:typecheck", "vscode:typecheck"]

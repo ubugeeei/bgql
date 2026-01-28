@@ -1178,6 +1178,92 @@ type User {
 4. **Documentation**: Self-documenting type names
 5. **Refactoring Safety**: Compiler catches type mismatches
 
+### 2.15 Opaque Types
+
+Opaque types are similar to newtypes but with an important distinction: the underlying type is completely hidden from clients. This provides true encapsulation.
+
+```graphql
+# Define opaque types
+opaque Email = String
+opaque UserId = ID
+opaque Money = Int
+
+type User {
+  id: UserId
+  email: Email
+  balance: Money
+}
+```
+
+#### Opaque vs Newtype
+
+| Feature | Newtype | Opaque |
+|---------|---------|--------|
+| Underlying type visible | Yes | No |
+| Client can construct | Yes (with underlying value) | No (must use factory) |
+| Introspection shows underlying | Yes | No |
+| Validation location | Client or Server | Server only |
+
+```graphql
+# Newtype: underlying type is visible
+newtype UserId = ID
+# Client knows UserId is based on ID and can construct it
+
+# Opaque: underlying type is hidden
+opaque Email = String
+# Client only sees "Email" type, cannot construct directly
+```
+
+#### Opaque Type Benefits
+
+1. **True encapsulation**: Implementation details hidden from clients
+2. **Server-side validation**: Only server can create valid instances
+3. **API stability**: Underlying type can change without breaking clients
+4. **Security**: Sensitive data patterns are hidden
+
+```graphql
+# Client sees only the opaque type
+opaque SecureToken = String
+
+type AuthResult {
+  token: SecureToken  # Client can't construct, only receive
+}
+
+type Mutation {
+  # Server creates and returns SecureToken
+  login(email: Email, password: String): AuthResult
+
+  # Server receives and validates SecureToken
+  validateSession(token: SecureToken): SessionResult
+}
+```
+
+#### Opaque Type Serialization
+
+Opaque types serialize as their underlying type, but clients don't know the underlying type:
+
+```json
+{
+  "user": {
+    "id": "user_123",     // UserId serializes as string (but client sees it as UserId)
+    "email": "test@example.com"  // Email serializes as string (but client sees it as Email)
+  }
+}
+```
+
+#### Opaque Type with Validation
+
+```graphql
+# Server validates that the underlying String is a valid email
+opaque Email = String @email
+
+# Server validates the format
+opaque PhoneNumber = String @pattern(regex: "^\\+[1-9]\\d{1,14}$")
+
+# Server validates the range
+opaque Percentage = Float @range(min: 0, max: 100)
+```
+
 ## 3. Nullable and Non-nullable
 
 ### 3.1 Non-nullable by Default
@@ -1550,9 +1636,91 @@ input CreateUserInput {
 }
 ```
 
-### 8.2 Input Union (Better GraphQL Exclusive Feature)
+### 8.2 Input Enum (Better GraphQL Exclusive Feature)
 
-Better GraphQL supports Input Union, which is not available in GraphQL.
+Better GraphQL supports Input Enum, allowing enum variants to carry input data. This is more expressive than input unions and follows Rust-style enum semantics.
+
+```graphql
+# Input enum with variant data
+input enum LoginMethod {
+  Email { email: String, password: String }
+  OAuth { provider: OAuthProvider, token: String }
+  Phone { phoneNumber: String, verificationCode: String }
+  Passkey { credentialId: String, authenticatorData: String }
+}
+
+type Mutation {
+  login(method: LoginMethod): AuthResult
+}
+```
+
+#### Input Enum vs Input Union
+
+Input enum is preferred over input union for:
+- **Discriminated unions**: When you need to distinguish variants by a tag
+- **Variant-specific data**: When each variant has different fields
+- **Type safety**: Compile-time exhaustiveness checking
+
+```graphql
+# Input enum (preferred)
+input enum PaymentMethod {
+  Card { cardNumber: String, cvv: String, expiry: String }
+  BankTransfer { accountNumber: String, routingNumber: String }
+  Crypto { walletAddress: String, network: CryptoNetwork }
+}
+
+# vs Input union (legacy approach)
+input CardPayment { cardNumber: String, cvv: String, expiry: String }
+input BankPayment { accountNumber: String, routingNumber: String }
+input CryptoPayment { walletAddress: String, network: CryptoNetwork }
+input union PaymentMethodLegacy = CardPayment | BankPayment | CryptoPayment
+```
+
+#### Input Enum Serialization
+
+```json
+{
+  "method": {
+    "__variant": "Email",
+    "email": "user@example.com",
+    "password": "secret"
+  }
+}
+```
+
+Alternative serialization with external tagging:
+
+```json
+{
+  "method": {
+    "Email": {
+      "email": "user@example.com",
+      "password": "secret"
+    }
+  }
+}
+```
+
+#### Unit Variants
+
+Input enums can have unit variants (no data):
+
+```graphql
+input enum SortOrder {
+  Ascending
+  Descending
+  Random { seed: Option<Int> }
+}
+```
+
+```json
+{ "order": { "__variant": "Ascending" } }
+{ "order": { "__variant": "Random", "seed": 42 } }
+```
+
+### 8.3 Input Union (Legacy)
+
+Input unions are still supported for backwards compatibility, but input enums are preferred.
 
 ```graphql
 input EmailCredentials {
@@ -1589,7 +1757,7 @@ type Mutation {
 }
 ```
 
-### 8.3 Patch Modifier
+### 8.4 Patch Modifier
 
 Generates an input type for partial updates.
 

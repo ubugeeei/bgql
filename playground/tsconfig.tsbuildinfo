@@ -1,0 +1,1 @@
+{"root":["./src/main.ts","./src/vite-env.d.ts","./src/composables/usebettergraphql.ts","./src/app.vue","./src/components/editorpanel.vue","./src/components/header.vue","./src/components/outputpanel.vue","./src/components/statusbar.vue"],"version":"5.6.3"}

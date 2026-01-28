@@ -1,0 +1,13 @@
+name = "Better GraphQL"
+grammar = "bgql"
+path_suffixes = ["bgql"]
+line_comments = ["#"]
+autoclose_before = "}])'\""
+brackets = [
+  { start = "{", end = "}", close = true, newline = true },
+  { start = "[", end = "]", close = true, newline = true },
+  { start = "(", end = ")", close = true, newline = false },
+  { start = "\"", end = "\"", close = true, newline = false, not_in = ["string", "comment"] },
+]
+word_characters = ["_"]
+tab_size = 2

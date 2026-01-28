@@ -832,3 +832,574 @@ type User {
   bio: Option<String> @transform(fn: "sanitize", params: { allowedTags: ["b", "i"] })
 }
 ```
+
+## 12. Advanced Streaming Directives
+
+### 12.1 @binary
+
+Marks a field as returning binary stream data for media or file content.
+
+```graphql
+directive @binary(
+  """Enable progressive download/playback"""
+  progressive: Boolean = false
+
+  """Chunk size for streaming (bytes)"""
+  chunkSize: Uint = 65536
+) on FIELD_DEFINITION
+
+# Example
+type Audio {
+  format: AudioFormat
+  duration: Float
+  url: String
+
+  """Binary stream for progressive playback"""
+  stream: BinaryStream @binary(progressive: true, chunkSize: 32768)
+}
+
+type Video {
+  format: VideoFormat
+  width: Uint
+  height: Uint
+
+  """Binary stream with chunked transfer"""
+  stream: BinaryStream @binary(progressive: true)
+  hlsUrl: String
+}
+```
+
+### 12.2 @resumable
+
+Enables pause/resume functionality for long-running queries.
+
+```graphql
+directive @resumable(
+  """Time-to-live for checkpoints (seconds)"""
+  ttl: Uint = 3600
+
+  """Interval for creating checkpoints (items processed)"""
+  checkpointInterval: Uint = 50
+) on QUERY
+
+# Example
+query GetLargeFeed @resumable(ttl: 7200, checkpointInterval: 100) {
+  feed @stream(initialCount: 10) {
+    id
+    content
+    media {
+      ... on Video {
+        stream @binary
+      }
+    }
+  }
+}
+```
+
+### 12.3 @priority (Extended)
+
+Enhanced priority directive for query scheduling.
+
+```graphql
+directive @priority(
+  """Priority level (1 is highest, 10 is lowest)"""
+  level: Int = 5
+
+  """Optional deadline for completion"""
+  deadline: Option<DateTime>
+
+  """Whether this task can be preempted by higher priority tasks"""
+  preemptible: Boolean = true
+) on QUERY | MUTATION | FIELD
+
+# Example
+query GetCriticalData @priority(level: 1, preemptible: false) {
+  urgentNotifications {
+    id
+    message
+  }
+}
+
+query GetAnalytics @priority(level: 8, deadline: "2024-01-01T00:00:00Z") {
+  statistics {
+    views
+    engagement
+  }
+}
+```
+
+### 12.4 @resources
+
+Specifies resource requirements for query scheduling.
+
+```graphql
+directive @resources(
+  """CPU usage (0.0-1.0)"""
+  cpu: Float
+
+  """Memory requirement (bytes)"""
+  memory: Uint
+
+  """I/O intensity level"""
+  io: ResourceLevel = LOW
+
+  """Network intensity level"""
+  network: ResourceLevel = LOW
+) on FIELD_DEFINITION
+
+enum ResourceLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+# Example
+type Query {
+  """Light query - minimal resources"""
+  user(id: ID): User @resources(cpu: 0.1, memory: 1048576)
+
+  """Heavy query - significant resources"""
+  generateReport(params: ReportParams): Report @resources(
+    cpu: 0.8,
+    memory: 536870912,
+    io: HIGH
+  )
+}
+```
+
+## 13. Component Model Directives
+
+### 13.1 @server (Extended)
+
+Extended server-side fragment directive with caching and isolation.
+
+```graphql
+directive @server(
+  """Execute only on server side"""
+  isolate: Boolean = true
+
+  """Cache strategy for the fragment"""
+  cache: CacheStrategy = NONE
+
+  """Allow pre-rendering of this fragment"""
+  prerender: Boolean = false
+) on FRAGMENT_DEFINITION
+
+enum CacheStrategy {
+  NONE      # No caching
+  REQUEST   # Cache per request
+  USER      # Cache per user session
+  GLOBAL    # Global cache
+}
+
+# Example
+fragment UserProfile on User @server(cache: USER, prerender: true) {
+  id
+  name
+  avatar {
+    url
+    blurHash
+  }
+  ... @defer(label: "bio") {
+    bio
+    socialLinks
+  }
+}
+```
+
+### 13.2 @boundary
+
+Defines client-server boundaries for data isolation.
+
+```graphql
+directive @boundary(
+  """Server-only field (never sent to client)"""
+  server: Boolean = false
+
+  """Client-only field"""
+  client: Boolean = false
+
+  """Serialization strategy when crossing boundary"""
+  serialize: SerializeStrategy = JSON
+) on OBJECT | FIELD_DEFINITION
+
+enum SerializeStrategy {
+  JSON       # Standard JSON serialization
+  BINARY     # Binary serialization (msgpack)
+  REFERENCE  # ID reference only (fetch separately)
+}
+
+# Example
+type User {
+  id: ID
+  name: String
+  email: String
+
+  """Never sent to client"""
+  passwordHash: String @boundary(server: true)
+
+  """Sensitive data - server only"""
+  internalNotes: String @boundary(server: true)
+
+  """Large data - fetch separately if needed"""
+  activityLog: List<Activity> @boundary(serialize: REFERENCE)
+}
+```
+
+### 13.3 @island
+
+Defines interactive islands for partial hydration.
+
+```graphql
+directive @island(
+  """Island identifier"""
+  name: String
+
+  """Hydration strategy"""
+  hydrate: HydrationStrategy = VISIBLE
+
+  """Client bundle to load for this island"""
+  clientBundle: Option<String>
+) on FRAGMENT_DEFINITION
+
+enum HydrationStrategy {
+  IMMEDIATE    # Hydrate immediately on page load
+  IDLE         # Hydrate during browser idle time
+  VISIBLE      # Hydrate when scrolled into view
+  INTERACTION  # Hydrate on user interaction
+  NEVER        # Static content, no hydration
+}
+
+# Example
+fragment CommentSection on Post @island(
+  name: "comments",
+  hydrate: VISIBLE,
+  clientBundle: "comments.js"
+) {
+  comments @stream(initialCount: 5) {
+    id
+    author { name avatarUrl }
+    content
+    createdAt
+  }
+  commentCount
+}
+
+fragment ShareButtons on Post @island(
+  name: "share",
+  hydrate: INTERACTION
+) {
+  shareUrl
+  title
+  platforms
+}
+```
+
+### 13.4 @hydrate
+
+Specifies hydration behavior for fragment spreads.
+
+```graphql
+directive @hydrate(
+  """Hydration strategy"""
+  strategy: HydrationStrategy = IDLE
+
+  """Hydration priority"""
+  priority: HydrationPriority = NORMAL
+) on FRAGMENT_SPREAD | INLINE_FRAGMENT
+
+enum HydrationPriority {
+  CRITICAL  # Must hydrate first
+  HIGH      # High priority
+  NORMAL    # Default priority
+  LOW       # Can wait
+}
+
+# Example
+query GetPage($id: ID) {
+  page(id: $id) {
+    title
+    content
+
+    # Critical interactive elements - hydrate immediately
+    ...NavigationMenu @hydrate(strategy: IMMEDIATE, priority: CRITICAL)
+
+    # Comments - hydrate when visible
+    ...CommentSection @hydrate(strategy: VISIBLE, priority: NORMAL)
+
+    # Share buttons - hydrate on interaction
+    ...ShareButtons @hydrate(strategy: INTERACTION, priority: LOW)
+  }
+}
+```
+
+## 14. Client-Server Isolation (Experimental Vision)
+
+> **Note:** This section describes experimental features and future design goals inspired by React Server Components. The Vue-specific syntax extensions described here are not yet implemented and represent a long-term vision for the project.
+
+### 14.1 Design Philosophy
+
+BGQL's Client-Server Isolation aims to provide React Server Components-like capabilities in a framework-agnostic way, with Vue as the first-class implementation target.
+
+**Core Principles:**
+
+1. **Server-resolved queries stay on server** - Data that doesn't need to reach the client is resolved server-side and only the rendered HTML is sent
+2. **Minimal client payload** - Only hydration-necessary JavaScript and data are sent to the client
+3. **Clear boundaries** - Explicit demarcation between server and client code/data
+
+### 14.2 Server Field Isolation
+
+```graphql
+type User {
+  id: ID
+  name: String
+  email: String
+
+  # Server-only fields - resolved on server, never serialized to client
+  passwordHash: String @boundary(server: true)
+
+  # Used for server-side rendering, but result (HTML) is sent to client
+  formattedBio: HTML @server(renderOnly: true)
+}
+
+# Server Fragment - entire fragment resolved server-side
+fragment UserCard on User @server {
+  id
+  name
+  avatar {
+    url
+    blurHash  # For placeholder
+  }
+}
+```
+
+### 14.3 Vue Integration (Future Vision)
+
+> **⚠️ Experimental:** The following Vue syntax extensions are aspirational and not yet implemented. They represent the long-term vision for deep Vue integration.
+
+#### 14.3.1 `<script server>` (Proposed)
+
+A new script block that executes only on the server during SSR:
+
+```vue
+<!-- UserProfile.vue -->
+<script server>
+// This code runs ONLY on the server
+// Never bundled for client, never sent to browser
+
+import { useServerFragment } from '@bgql/client/vue'
+import { sendEmail } from '~/server/email'  // Server-only import
+
+const props = defineServerProps<{
+  userId: string
+}>()
+
+// Server-side data fetching with @server fragment
+const { data } = await useServerFragment(USER_PROFILE_FRAGMENT, {
+  id: props.userId
+})
+
+// Server-side logic (e.g., logging, notifications)
+if (data.user.needsVerification) {
+  await sendEmail(data.user.email, 'verify')
+}
+
+// Only `user` is exposed to template, email logic stays on server
+defineExpose({ user: data.user })
+</script>
+
+<script setup>
+// Client-side script - runs on both server (SSR) and client (hydration)
+import { ref } from 'vue'
+
+const isFollowing = ref(false)
+const toggleFollow = () => { /* client-side interaction */ }
+</script>
+
+<template>
+  <!-- Template receives server-resolved data -->
+  <div class="profile">
+    <img :src="user.avatar.url" />
+    <h1>{{ user.name }}</h1>
+
+    <!-- Client-interactive island -->
+    <button @click="toggleFollow">
+      {{ isFollowing ? 'Unfollow' : 'Follow' }}
+    </button>
+  </div>
+</template>
+```
+
+#### 14.3.2 `defineServerProps` (Proposed)
+
+Type-safe props that are only available during server-side execution:
+
+```typescript
+// Proposed API
+const props = defineServerProps<{
+  // Available on server during SSR
+  userId: string
+  sessionToken: string  // Sensitive - never sent to client
+}>()
+
+// After SSR, only non-sensitive data is serialized for hydration
+```
+
+#### 14.3.3 Server Actions (Proposed)
+
+Server-side mutations invocable from client components:
+
+```vue
+<script server>
+// Server action - executes on server, callable from client
+const updateProfile = defineServerAction(async (input: UpdateProfileInput) => {
+  // Runs on server with full access to server resources
+  const result = await db.users.update(input)
+  return result
+})
+</script>
+
+<script setup>
+// Client can call server action
+const onSubmit = async (formData) => {
+  // This triggers a server request, not client-side execution
+  await updateProfile(formData)
+}
+</script>
+```
+
+### 14.4 Hydration Strategies
+
+Combined with `@island` and `@hydrate` directives:
+
+```vue
+<template>
+  <article>
+    <!-- Static: rendered on server, no hydration -->
+    <header>{{ article.title }}</header>
+    <div v-html="article.content" />
+
+    <!-- Island: hydrated when visible -->
+    <Bgql.Defer
+      label="comments"
+      :hydrate="{ strategy: 'visible', priority: 'normal' }"
+    >
+      <CommentSection :articleId="article.id" />
+    </Bgql.Defer>
+
+    <!-- Island: hydrated on interaction -->
+    <Bgql.Defer
+      label="share"
+      :hydrate="{ strategy: 'interaction' }"
+    >
+      <ShareButtons :url="article.shareUrl" />
+    </Bgql.Defer>
+  </article>
+</template>
+```
+
+### 14.5 Implementation Roadmap
+
+| Phase | Feature | Status |
+|-------|---------|--------|
+| 1 | `@boundary` directive runtime | ✅ Designed |
+| 2 | `@server` fragment execution | 🚧 In Progress |
+| 3 | Vite plugin SSR integration | ✅ Basic |
+| 4 | `<script server>` transform | 📋 Planned |
+| 5 | `defineServerProps` macro | 📋 Planned |
+| 6 | Server Actions | 📋 Future |
+
+## 15. Module System Directives
+
+### 14.1 @mod
+
+Declares a module within the schema.
+
+```graphql
+directive @mod(
+  """Module path (e.g., "users", "users::auth")"""
+  path: String
+) on SCHEMA
+
+# Example
+# In users.graphql
+schema @mod(path: "users") {
+  query: Query
+}
+
+# In users/auth.graphql
+schema @mod(path: "users::auth") {
+  query: Query
+}
+```
+
+### 14.2 @use
+
+Imports types from other modules.
+
+```graphql
+directive @use(
+  """Module path to import from"""
+  from: String
+
+  """Specific items to import (empty = all public items)"""
+  items: Option<List<String>>
+
+  """Import all public items (glob import)"""
+  glob: Boolean = false
+
+  """Alias for imported items"""
+  as: Option<String>
+) on SCHEMA
+
+# Example
+# Import specific types
+schema @use(from: "users", items: ["User", "UserInput"]) {
+  query: Query
+}
+
+# Import all public types
+schema @use(from: "common", glob: true) {
+  query: Query
+}
+
+# Import with alias
+schema @use(from: "users", items: ["User"], as: "AuthUser") {
+  query: Query
+}
+```
+
+### 14.3 @pub
+
+Controls visibility of types across modules.
+
+```graphql
+directive @pub(
+  """Visibility level"""
+  visibility: Visibility = PUBLIC
+) on OBJECT | INPUT_OBJECT | ENUM | SCALAR | INTERFACE | UNION
+
+enum Visibility {
+  PUBLIC   # Visible everywhere
+  CRATE    # Visible within the same crate/package
+  SUPER    # Visible to parent module
+  PRIVATE  # Visible only within same module (default without @pub)
+}
+
+# Example
+# Public type - visible everywhere
+type User @pub {
+  id: ID
+  name: String
+}
+
+# Crate-internal type
+type InternalConfig @pub(visibility: CRATE) {
+  setting: String
+}
+
+# Module-private type (default)
+type PrivateHelper {
+  data: String
+}
+```

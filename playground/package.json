@@ -1,0 +1,36 @@
+{
+  "name": "better-graphql-playground",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "deploy": "vite build && gh-pages -d dist",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --type-aware --fix",
+    "fmt": "oxfmt --write src",
+    "fmt:check": "oxfmt --check src"
+  },
+  "dependencies": {
+    "@mdi/font": "^7.4.47",
+    "bgql_wasm": "../crates/bgql_wasm/pkg",
+    "monaco-editor": "^0.52.2",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.33.1",
+    "@typescript/native-preview": "^7.0.0-dev.20250122",
+    "oxfmt": "^0.27.0",
+    "oxlint": "^1.42.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "gh-pages": "^6.2.0",
+    "sass": "^1.83.4",
+    "tsdown": "^0.9.0",
+    "typescript": "~5.6.3",
+    "vite": "8.0.0-beta.10",
+    "vue-tsc": "^2.2.0"
+  }
+}

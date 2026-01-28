@@ -21,16 +21,16 @@ schema
 }
 
 # =============================================================================
-# Newtypes (Nominal Types for Type Safety)
+# Opaque Types (Nominal Types for Type Safety)
 # =============================================================================
 
-newtype UserId = ID
-newtype PostId = ID
-newtype CommentId = ID
-newtype TagId = ID
+opaque UserId = ID
+opaque PostId = ID
+opaque CommentId = ID
+opaque TagId = ID
 
-newtype EmailAddress = String @email
-newtype PasswordHash = String
+opaque EmailAddress = String @email
+opaque PasswordHash = String
 
 # =============================================================================
 # Interfaces
