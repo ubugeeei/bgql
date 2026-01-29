@@ -1,0 +1,89 @@
+# Input Types Module
+#
+# Validation directives are applied to input fields
+# - @minLength, @maxLength: String length constraints
+# - @min, @max: Numeric constraints
+# - @email, @url: Format validators
+# - @pattern: Regex validation
+# - @trim, @lowercase: Input transformations
+
+use super::types::{UserRole, PostStatus, OAuthProvider}
+
+# ============================================
+# User Inputs
+# ============================================
+
+pub input CreateUserInput {
+  name: String @minLength(3) @maxLength(100) @trim
+  email: String @email @trim @lowercase
+  password: String @minLength(8) @pattern("^(?=.*[A-Z])(?=.*[0-9])")
+  bio: Option<String> @maxLength(500) @sanitize
+  role: Option<UserRole>
+}
+
+pub input UpdateUserInput {
+  name: Option<String> @minLength(3) @maxLength(100) @trim
+  email: Option<String> @email @trim @lowercase
+  bio: Option<String> @maxLength(500) @sanitize
+  avatarUrl: Option<String> @url
+}
+
+# ============================================
+# Post Inputs
+# ============================================
+
+pub input CreatePostInput {
+  title: String @minLength(5) @maxLength(200) @trim
+  content: String @minLength(10)
+  status: Option<PostStatus>
+}
+
+pub input UpdatePostInput {
+  title: Option<String> @minLength(5) @maxLength(200) @trim
+  content: Option<String> @minLength(10)
+  status: Option<PostStatus>
+}
+
+# ============================================
+# Auth Inputs
+#
+# Input union for polymorphic authentication
+# ============================================
+
+pub input union LoginCredentials = EmailCredentials | OAuthCredentials
+
+pub input EmailCredentials {
+  email: String @email @trim @lowercase
+  password: String @minLength(8)
+}
+
+pub input OAuthCredentials {
+  provider: OAuthProvider
+  token: String
+}
+
+# ============================================
+# Filter Inputs
+# ============================================
+
+pub input UserFilter {
+  role: Option<UserRole>
+  search: Option<String> @maxLength(100)
+}
+
+pub input PostFilter {
+  status: Option<PostStatus>
+  authorId: Option<ID>
+  search: Option<String> @maxLength(100)
+}
+
+# ============================================
+# Pagination Inputs
+# ============================================
+
+pub input PaginationInput {
+  first: Option<Int> @min(1) @max(100)
+  after: Option<String>
+  last: Option<Int> @min(1) @max(100)
+  before: Option<String>
+}

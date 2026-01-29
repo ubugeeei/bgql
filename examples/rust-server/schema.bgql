@@ -1,0 +1,175 @@
+# Better GraphQL Schema - Blog API Example
+
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+# =============================================================================
+# Opaque Types (Type-safe IDs)
+# =============================================================================
+
+opaque UserId = ID
+opaque PostId = ID
+opaque CommentId = ID
+
+# =============================================================================
+# Enums
+# =============================================================================
+
+enum PostStatus {
+  Draft
+  Published
+  Archived
+}
+
+# =============================================================================
+# Generic Types (Pagination)
+# =============================================================================
+
+type Connection<T> {
+  edges: List<Edge<T>>
+  pageInfo: PageInfo
+  totalCount: Int
+}
+
+type Edge<T> {
+  cursor: String
+  node: T
+}
+
+type PageInfo {
+  hasNextPage: Boolean
+  hasPreviousPage: Boolean
+  startCursor: Option<String>
+  endCursor: Option<String>
+}
+
+# =============================================================================
+# Error Types
+# =============================================================================
+
+interface Error {
+  message: String
+  code: String
+}
+
+type NotFoundError implements Error {
+  message: String
+  code: String
+  resourceType: String
+  resourceId: ID
+}
+
+type ValidationError implements Error {
+  message: String
+  code: String
+  field: Option<String>
+}
+
+# =============================================================================
+# Domain Types
+# =============================================================================
+
+type User {
+  id: UserId
+  name: String
+  email: String
+  bio: Option<String>
+  createdAt: DateTime
+  posts: List<Post>
+  postsCount: Int
+}
+
+type Post {
+  id: PostId
+  title: String
+  content: String
+  status: PostStatus
+  authorId: UserId
+  author: Option<User>
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+}
+
+type Comment {
+  id: CommentId
+  content: String
+  postId: PostId
+  authorId: UserId
+  createdAt: DateTime
+}
+
+# =============================================================================
+# Input Types
+# =============================================================================
+
+input CreatePostInput {
+  title: String
+  content: String
+  status: Option<PostStatus>
+}
+
+input UpdatePostInput {
+  title: Option<String>
+  content: Option<String>
+  status: Option<PostStatus>
+}
+
+input CreateCommentInput {
+  postId: PostId
+  content: String
+}
+
+input PaginationInput {
+  first: Option<Int>
+  after: Option<String>
+}
+
+input PostFilter {
+  status: Option<PostStatus>
+  authorId: Option<UserId>
+}
+
+# =============================================================================
+# Result Types
+# =============================================================================
+
+union UserResult = User | NotFoundError
+union PostResult = Post | NotFoundError | ValidationError
+union DeleteResult = DeleteSuccess | NotFoundError
+union CommentResult = Comment | NotFoundError | ValidationError
+
+type DeleteSuccess {
+  success: Boolean
+  deletedId: ID
+}
+
+# =============================================================================
+# Scalars
+# =============================================================================
+
+scalar DateTime
+
+# =============================================================================
+# Query
+# =============================================================================
+
+type Query {
+  user(id: UserId): UserResult
+  users(pagination: Option<PaginationInput>): Connection<User>
+  post(id: PostId): PostResult
+  posts(filter: Option<PostFilter>, pagination: Option<PaginationInput>): Connection<Post>
+}
+
+# =============================================================================
+# Mutation
+# =============================================================================
+
+type Mutation {
+  createPost(input: CreatePostInput): PostResult
+  updatePost(id: PostId, input: UpdatePostInput): PostResult
+  publishPost(id: PostId): PostResult
+  deletePost(id: PostId): DeleteResult
+  createComment(input: CreateCommentInput): CommentResult
+}

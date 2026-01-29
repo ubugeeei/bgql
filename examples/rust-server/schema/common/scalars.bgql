@@ -1,0 +1,22 @@
+# =============================================================================
+# Common Scalar & Opaque Types
+# =============================================================================
+# Demonstrates: opaque types, newtypes with validation
+
+# Opaque IDs - Nominal typing for type safety
+# UserId and PostId are incompatible even though both wrap ID
+pub opaque UserId = ID
+pub opaque PostId = ID
+pub opaque CommentId = ID
+pub opaque TagId = ID
+
+# Validated opaque types
+pub opaque EmailAddress = String @email
+pub opaque URL = String @url
+pub opaque Slug = String @pattern(regex: "^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+# Percentage type with range validation
+pub opaque Percentage = Float @range(min: 0, max: 100)
+
+# Positive integer
+pub opaque PositiveInt = Int @positive

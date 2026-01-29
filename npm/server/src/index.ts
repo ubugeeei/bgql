@@ -16,3 +16,7 @@ export * from './validation';
 export * from './errors';
 export * from './types';
 export * from './playground';
+<<<<<<< HEAD
+=======
+export * from './schema';
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9

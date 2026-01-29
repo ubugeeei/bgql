@@ -1,0 +1,78 @@
+# Error Types Module
+#
+# Typed errors as values - not exceptions
+# Each error type has a specific structure for client handling
+
+use super::types::UserRole
+
+# ============================================
+# Error Types
+# ============================================
+
+pub type NotFoundError {
+  message: String
+  code: String
+  resourceType: String
+  resourceId: String
+}
+
+pub type ValidationError {
+  message: String
+  code: String
+  field: String
+  constraint: String
+}
+
+pub type UnauthorizedError {
+  message: String
+  code: String
+  requiredRole: Option<UserRole>
+}
+
+pub type ForbiddenError {
+  message: String
+  code: String
+  reason: String
+}
+
+pub type InvalidCredentialsError {
+  message: String
+  code: String
+}
+
+pub type RateLimitError {
+  message: String
+  code: String
+  retryAfter: Uint
+}
+
+# ============================================
+# Result Unions
+#
+# Pattern: Operation returns union of success | errors
+# Client handles all cases explicitly via __typename
+# ============================================
+
+use super::types::{User, Post, AuthPayload}
+
+pub union UserResult = User | NotFoundError | UnauthorizedError
+
+pub union PostResult = Post | NotFoundError
+
+pub union CreateUserResult = User | ValidationError
+
+pub union UpdateUserResult = User | ValidationError | NotFoundError | UnauthorizedError
+
+pub union DeleteResult = DeleteSuccess | NotFoundError | UnauthorizedError
+
+pub union CreatePostResult = Post | ValidationError | UnauthorizedError
+
+pub union UpdatePostResult = Post | ValidationError | NotFoundError | UnauthorizedError
+
+pub union AuthResult = AuthPayload | InvalidCredentialsError | ValidationError
+
+# Success type for delete operations
+pub type DeleteSuccess {
+  success: Boolean
+  deletedId: ID
+}

@@ -3,6 +3,12 @@
 //! # Usage
 //!
 //! ```bash
+<<<<<<< HEAD
+=======
+//! # Initialize a new project
+//! bgql init my-api
+//!
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 //! # Validate a schema
 //! bgql check schema.bgql
 //!
@@ -12,13 +18,29 @@
 //! # Generate TypeScript types
 //! bgql codegen --lang typescript schema.bgql
 //!
+<<<<<<< HEAD
+=======
+//! # Start the development server
+//! bgql dev
+//!
+//! # Build for production
+//! bgql build
+//!
+//! # Watch for changes
+//! bgql watch
+//!
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 //! # Start the language server
 //! bgql lsp
 //! ```
 
 use bgql_core::Interner;
 use bgql_syntax::{parse, FormatOptions};
+<<<<<<< HEAD
 use clap::{Parser, Subcommand};
+=======
+use clap::{Parser, Subcommand, ValueEnum};
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 use colored::Colorize;
 use std::path::{Path, PathBuf};
 
@@ -36,15 +58,81 @@ pub struct Cli {
     pub command: Commands,
 }
 
+<<<<<<< HEAD
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+=======
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum ProjectTemplate {
+    /// Minimal project with basic schema
+    Minimal,
+    /// Full-stack project with server and client
+    Fullstack,
+    /// Server-only project
+    Server,
+    /// API-first project with OpenAPI integration
+    Api,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum CodegenLanguage {
+    Typescript,
+    Rust,
+    Go,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum IdeTarget {
+    /// Zed editor
+    Zed,
+    /// Visual Studio Code
+    Vscode,
+    /// Neovim
+    Neovim,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Initialize a new Better GraphQL project
+    Init {
+        /// Project name
+        name: String,
+
+        /// Project template
+        #[arg(short, long, value_enum, default_value = "minimal")]
+        template: ProjectTemplate,
+
+        /// Use TypeScript (for Node.js projects)
+        #[arg(long)]
+        typescript: bool,
+
+        /// Skip git initialization
+        #[arg(long)]
+        no_git: bool,
+    },
+
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Check GraphQL files for errors
     Check {
         #[arg(required = true)]
         files: Vec<PathBuf>,
 
+<<<<<<< HEAD
         #[arg(long)]
         strict: bool,
+=======
+        /// Enable strict mode (treat warnings as errors)
+        #[arg(long)]
+        strict: bool,
+
+        /// Check query complexity
+        #[arg(long)]
+        complexity: bool,
+
+        /// Maximum allowed query depth
+        #[arg(long, default_value = "10")]
+        max_depth: usize,
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     },
 
     /// Format GraphQL files
@@ -53,18 +141,31 @@ pub enum Commands {
         #[arg(required = true)]
         files: Vec<PathBuf>,
 
+<<<<<<< HEAD
         #[arg(long)]
         check: bool,
 
         #[arg(long, default_value = "2")]
         indent: usize,
 
+=======
+        /// Check if files are formatted (don't modify)
+        #[arg(long)]
+        check: bool,
+
+        /// Indentation size
+        #[arg(long, default_value = "2")]
+        indent: usize,
+
+        /// Use tabs instead of spaces
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         #[arg(long)]
         tabs: bool,
     },
 
     /// Generate code from GraphQL schema
     Codegen {
+<<<<<<< HEAD
         #[arg(required = true)]
         schema: PathBuf,
 
@@ -73,6 +174,80 @@ pub enum Commands {
 
         #[arg(short, long, default_value = "typescript")]
         lang: String,
+=======
+        /// Schema file path
+        #[arg(required = true)]
+        schema: PathBuf,
+
+        /// Output file or directory
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Target language
+        #[arg(short, long, value_enum, default_value = "typescript")]
+        lang: CodegenLanguage,
+
+        /// Watch for changes and regenerate
+        #[arg(short, long)]
+        watch: bool,
+    },
+
+    /// Start the development server
+    Dev {
+        /// Schema file path
+        #[arg(default_value = "schema.bgql")]
+        schema: PathBuf,
+
+        /// Port to listen on
+        #[arg(short, long, default_value = "4000")]
+        port: u16,
+
+        /// Host to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+
+        /// Enable GraphQL Playground
+        #[arg(long)]
+        playground: bool,
+
+        /// Enable hot reload
+        #[arg(long)]
+        hot_reload: bool,
+    },
+
+    /// Build schema for production
+    Build {
+        /// Schema file path
+        #[arg(default_value = "schema.bgql")]
+        schema: PathBuf,
+
+        /// Output directory
+        #[arg(short, long, default_value = "dist")]
+        output: PathBuf,
+
+        /// Minify output
+        #[arg(long)]
+        minify: bool,
+
+        /// Generate introspection schema
+        #[arg(long)]
+        introspection: bool,
+    },
+
+    /// Watch files and run commands on change
+    Watch {
+        /// Files or directories to watch
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        /// Command to run on change
+        #[arg(short, long, default_value = "check")]
+        command: String,
+
+        /// File extensions to watch
+        #[arg(short, long, default_value = "bgql,graphql")]
+        extensions: String,
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     },
 
     /// Start the language server
@@ -80,19 +255,61 @@ pub enum Commands {
 
     /// Parse a GraphQL file and print the AST
     Parse {
+<<<<<<< HEAD
         file: PathBuf,
 
+=======
+        /// File to parse
+        file: PathBuf,
+
+        /// Output format (pretty, json, sexp)
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         #[arg(long, default_value = "pretty")]
         format: String,
     },
 
     /// Print version information
     Version,
+<<<<<<< HEAD
+=======
+
+    /// IDE/Editor integration
+    Ide {
+        /// Target IDE
+        #[arg(value_enum)]
+        target: IdeTarget,
+
+        /// Install the extension
+        #[arg(long)]
+        install: bool,
+
+        /// Uninstall the extension
+        #[arg(long)]
+        uninstall: bool,
+
+        /// Show extension info
+        #[arg(long)]
+        info: bool,
+    },
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
     match cli.command {
+<<<<<<< HEAD
         Commands::Check { files, strict } => check_files(&files, strict, cli.verbose),
+=======
+        Commands::Init { .. } => {
+            println!("Init command not yet implemented");
+            Ok(0)
+        }
+        Commands::Check {
+            files,
+            strict,
+            complexity: _,
+            max_depth: _,
+        } => check_files(&files, strict, cli.verbose),
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         Commands::Fmt {
             files,
             check,
@@ -103,7 +320,31 @@ pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             schema,
             output,
             lang,
+<<<<<<< HEAD
         } => generate_code(&schema, output.as_ref(), &lang),
+=======
+            watch: _,
+        } => {
+            let lang_str = match lang {
+                CodegenLanguage::Typescript => "typescript",
+                CodegenLanguage::Rust => "rust",
+                CodegenLanguage::Go => "go",
+            };
+            generate_code(&schema, output.as_ref(), lang_str)
+        }
+        Commands::Dev { .. } => {
+            println!("Development server not yet implemented");
+            Ok(0)
+        }
+        Commands::Build { .. } => {
+            println!("Build command not yet implemented");
+            Ok(0)
+        }
+        Commands::Watch { .. } => {
+            println!("Watch command not yet implemented");
+            Ok(0)
+        }
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         Commands::Lsp => {
             // Handled in main.rs
             Ok(0)
@@ -113,6 +354,15 @@ pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             println!("bgql {}", env!("CARGO_PKG_VERSION"));
             Ok(0)
         }
+<<<<<<< HEAD
+=======
+        Commands::Ide {
+            target,
+            install,
+            uninstall,
+            info,
+        } => handle_ide_command(target, install, uninstall, info, cli.verbose),
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     }
 }
 
@@ -468,6 +718,148 @@ fn capitalize(s: &str) -> String {
     }
 }
 
+<<<<<<< HEAD
+=======
+fn handle_ide_command(
+    target: IdeTarget,
+    install: bool,
+    uninstall: bool,
+    info: bool,
+    verbose: bool,
+) -> Result<i32, Box<dyn std::error::Error>> {
+    match target {
+        IdeTarget::Zed => handle_zed_command(install, uninstall, info, verbose),
+        IdeTarget::Vscode => {
+            println!("{} VS Code extension not yet available", "Info:".blue());
+            println!("  Install from marketplace: code --install-extension bgql.bgql");
+            Ok(0)
+        }
+        IdeTarget::Neovim => {
+            println!("{} Neovim plugin not yet available", "Info:".blue());
+            println!("  Add to your config:");
+            println!("    require('lspconfig').bgql.setup{{}}");
+            Ok(0)
+        }
+    }
+}
+
+fn handle_zed_command(
+    install: bool,
+    uninstall: bool,
+    info: bool,
+    verbose: bool,
+) -> Result<i32, Box<dyn std::error::Error>> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let zed_extensions_dir = PathBuf::from(&home).join(".config/zed/extensions/installed");
+    let bgql_ext_dir = zed_extensions_dir.join("bgql");
+
+    if info || (!install && !uninstall) {
+        println!("{}", "Better GraphQL - Zed Extension".green().bold());
+        println!();
+        println!("  Extension ID: bgql");
+        println!("  Version:      {}", env!("CARGO_PKG_VERSION"));
+        println!("  Features:");
+        println!("    - Syntax highlighting for .bgql files");
+        println!("    - Language Server Protocol support");
+        println!("    - Auto-completion and diagnostics");
+        println!();
+
+        if bgql_ext_dir.exists() {
+            println!("  Status: {} (at {})", "Installed".green(), bgql_ext_dir.display());
+        } else {
+            println!("  Status: {}", "Not installed".yellow());
+            println!();
+            println!("  To install: bgql ide zed --install");
+        }
+        return Ok(0);
+    }
+
+    if uninstall {
+        if bgql_ext_dir.exists() {
+            std::fs::remove_dir_all(&bgql_ext_dir)?;
+            println!("{} Removed bgql extension from Zed", "Success:".green().bold());
+        } else {
+            println!("{} bgql extension is not installed", "Info:".blue());
+        }
+        return Ok(0);
+    }
+
+    if install {
+        // Get the extension source directory
+        let extension_src = get_extension_source_dir()?;
+
+        if verbose {
+            println!("{} Extension source: {}", "Info:".blue(), extension_src.display());
+        }
+
+        // Create extensions directory if it doesn't exist
+        std::fs::create_dir_all(&zed_extensions_dir)?;
+
+        // Copy extension files
+        copy_dir_recursive(&extension_src, &bgql_ext_dir)?;
+
+        println!("{} Installed bgql extension to Zed", "Success:".green().bold());
+        println!();
+        println!("  Location: {}", bgql_ext_dir.display());
+        println!();
+        println!("  {} Restart Zed to activate the extension", "Note:".yellow());
+
+        return Ok(0);
+    }
+
+    Ok(0)
+}
+
+fn get_extension_source_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    // Try to find the extension in common locations
+    let candidates = [
+        // Development: relative to binary
+        std::env::current_exe()?
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join("../../editors/zed"),
+        // Development: current directory
+        PathBuf::from("editors/zed"),
+        // Installed: alongside binary
+        std::env::current_exe()?
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join("share/bgql/editors/zed"),
+        // System install
+        PathBuf::from("/usr/local/share/bgql/editors/zed"),
+    ];
+
+    for candidate in candidates {
+        if candidate.exists() && candidate.join("extension.toml").exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err("Could not find bgql Zed extension source. Make sure you're running from the bgql repository or have bgql properly installed.".into())
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if !dst.exists() {
+        std::fs::create_dir_all(dst)?;
+    }
+
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if ty.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
+    Ok(())
+}
+
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 fn parse_file(file: &Path, fmt: &str) -> Result<i32, Box<dyn std::error::Error>> {
     let source = std::fs::read_to_string(file)?;
     let interner = Interner::new();

@@ -1,0 +1,14 @@
+# =============================================================================
+# Common Module
+# =============================================================================
+# Demonstrates: module system, re-exports
+
+# Declare submodules
+mod scalars;
+mod errors;
+mod pagination;
+
+# Re-export all public items from submodules
+pub use::scalars::*
+pub use::errors::*
+pub use::pagination::*

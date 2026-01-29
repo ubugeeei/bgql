@@ -187,15 +187,60 @@ impl DiagnosticBag {
 
 /// Common diagnostic codes.
 pub mod codes {
+<<<<<<< HEAD
     pub const UNEXPECTED_TOKEN: &str = "E0001";
     pub const UNEXPECTED_EOF: &str = "E0002";
     pub const INVALID_SYNTAX: &str = "E0003";
+=======
+    // === Syntax Errors (E0001-E0009) ===
+    pub const UNEXPECTED_TOKEN: &str = "E0001";
+    pub const UNEXPECTED_EOF: &str = "E0002";
+    pub const INVALID_SYNTAX: &str = "E0003";
+
+    // === Type Resolution Errors (E0010-E0019) ===
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     pub const UNDEFINED_TYPE: &str = "E0010";
     pub const UNDEFINED_FIELD: &str = "E0011";
     pub const DUPLICATE_TYPE: &str = "E0012";
     pub const DUPLICATE_FIELD: &str = "E0013";
+<<<<<<< HEAD
     pub const TYPE_MISMATCH: &str = "E0020";
     pub const INVALID_DIRECTIVE: &str = "E0030";
+=======
+    pub const MISSING_INTERFACE_FIELD: &str = "E0014";
+    pub const INTERFACE_FIELD_TYPE_MISMATCH: &str = "E0015";
+    pub const CYCLIC_TYPE_REFERENCE: &str = "E0016";
+    pub const INVALID_EXTENSION_TARGET: &str = "E0017";
+
+    // === Type System Errors (E0020-E0029) ===
+    pub const TYPE_MISMATCH: &str = "E0020";
+    pub const GENERIC_CONSTRAINT_VIOLATION: &str = "E0021";
+    pub const INVALID_ARGUMENT_TYPE: &str = "E0022";
+    pub const MISSING_REQUIRED_ARGUMENT: &str = "E0023";
+    pub const ARITY_MISMATCH: &str = "E0024";
+
+    // === Directive Errors (E0030-E0039) ===
+    pub const INVALID_DIRECTIVE: &str = "E0030";
+    pub const DIRECTIVE_NOT_ALLOWED: &str = "E0031";
+    pub const DUPLICATE_DIRECTIVE: &str = "E0032";
+
+    // === Module Errors (E0040-E0049) ===
+    pub const MODULE_NOT_FOUND: &str = "E0040";
+    pub const PRIVATE_TYPE_LEAK: &str = "E0041";
+    pub const CYCLIC_MODULE_DEPENDENCY: &str = "E0042";
+
+    // === Schema Errors (E0050-E0059) ===
+    pub const MISSING_ROOT_TYPE: &str = "E0050";
+    pub const INVALID_ROOT_TYPE: &str = "E0051";
+    pub const DUPLICATE_SCHEMA: &str = "E0052";
+
+    // === Warnings (W0001-W0099) ===
+    pub const UNUSED_TYPE: &str = "W0001";
+    pub const UNUSED_FIELD: &str = "W0002";
+    pub const DEPRECATED_USAGE: &str = "W0003";
+    pub const NAMING_CONVENTION: &str = "W0004";
+    pub const POSSIBLE_TYPO: &str = "W0005";
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 #[cfg(test)]

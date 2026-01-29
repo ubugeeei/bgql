@@ -1,0 +1,47 @@
+{
+  "name": "@bgql/sdk",
+  "version": "0.1.0",
+  "description": "Strongly typed GraphQL SDK for Better GraphQL",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client.mjs",
+      "require": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server.mjs",
+      "require": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    },
+    "./gql": {
+      "import": "./dist/gql.mjs",
+      "require": "./dist/gql.js",
+      "types": "./dist/gql.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint --type-aware",
+    "fmt": "oxfmt --write src"
+  },
+  "keywords": ["graphql", "typescript", "sdk", "type-safe"],
+  "license": "MIT",
+  "devDependencies": {
+    "oxfmt": "^0.1.0",
+    "oxlint": "^0.17.0",
+    "@typescript/native-preview": "^7.0.0-dev.20250128.1",
+    "tsdown": "^0.6.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.0.0"
+  }
+}

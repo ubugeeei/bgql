@@ -468,6 +468,19 @@ impl<'a> RustGenerator<'a> {
             "// =============================================================================\n\n",
         );
 
+        self.output.push_str("use bgql_sdk::server::{Context, SdkResult};\n");
+        self.output.push_str("use std::sync::Arc;\n\n");
+
+        // Generate argument types for each resolver
+        for type_def in extract_types(self.document) {
+            if let TypeDefinition::Object(obj) = type_def {
+                let name = self.interner.get(obj.name.value);
+                if name == "Query" || name == "Mutation" || name == "Subscription" {
+                    self.write_args_types(obj);
+                }
+            }
+        }
+
         // Generate resolver traits for Query and Mutation
         for type_def in extract_types(self.document) {
             if let TypeDefinition::Object(obj) = type_def {
@@ -477,6 +490,50 @@ impl<'a> RustGenerator<'a> {
                 }
             }
         }
+
+        // Generate server builder extension
+        self.write_server_builder_ext();
+    }
+
+    fn write_args_types(&mut self, obj: &bgql_syntax::ObjectTypeDefinition<'_>) {
+        for field in &obj.fields {
+            if field.arguments.is_empty() {
+                continue;
+            }
+
+            let field_name = self.interner.get(field.name.value);
+            let struct_name = to_pascal_case(&field_name) + "Args";
+
+            self.output.push_str(&format!(
+                "/// Arguments for `{}`.\n",
+                field_name
+            ));
+            self.output
+                .push_str("#[derive(Debug, Clone, Deserialize)]\n");
+            self.output.push_str(&format!("pub struct {} {{\n", struct_name));
+
+            for arg in &field.arguments {
+                let arg_name = self.interner.get(arg.name.value);
+                let arg_type = self.convert_type(&arg.ty, self.interner);
+                let snake_name = to_snake_case(&arg_name);
+
+                if snake_name != arg_name {
+                    self.output
+                        .push_str(&format!("    #[serde(rename = \"{}\")]\n", arg_name));
+                }
+
+                // Skip serializing None values
+                if matches!(&arg.ty, Type::Option(_, _)) {
+                    self.output
+                        .push_str("    #[serde(default)]\n");
+                }
+
+                self.output
+                    .push_str(&format!("    pub {}: {},\n", snake_name, arg_type));
+            }
+
+            self.output.push_str("}\n\n");
+        }
     }
 
     fn write_resolver_trait(
@@ -485,10 +542,17 @@ impl<'a> RustGenerator<'a> {
         type_name: &str,
     ) {
         self.output
-            .push_str(&format!("/// {} resolvers.\n", type_name));
+            .push_str(&format!("/// {} resolvers trait.\n", type_name));
+        self.output.push_str("///\n");
+        self.output.push_str("/// Implement this trait to define your resolvers.\n");
+        self.output.push_str("/// ```ignore\n");
+        self.output.push_str(&format!("/// impl {}Resolvers for MyResolvers {{\n", type_name));
+        self.output.push_str("///     // ...\n");
+        self.output.push_str("/// }}\n");
+        self.output.push_str("/// ```\n");
         self.output.push_str("#[async_trait]\n");
         self.output.push_str(&format!(
-            "pub trait {}Resolvers<Ctx: Send + Sync> {{\n",
+            "pub trait {}Resolvers: Send + Sync + 'static {{\n",
             type_name
         ));
 
@@ -496,29 +560,118 @@ impl<'a> RustGenerator<'a> {
             let name = self.interner.get(field.name.value);
             let return_type = self.convert_type(&field.ty, self.interner);
 
-            let args = if field.arguments.is_empty() {
-                "&self, ctx: &Ctx".to_string()
+            let args_param = if field.arguments.is_empty() {
+                String::new()
             } else {
-                let arg_list: Vec<_> = field
-                    .arguments
-                    .iter()
-                    .map(|arg| {
-                        let arg_name = self.interner.get(arg.name.value);
-                        let arg_type = self.convert_type(&arg.ty, self.interner);
-                        format!("{}: {}", to_snake_case(&arg_name), arg_type)
-                    })
-                    .collect();
-                format!("&self, ctx: &Ctx, {}", arg_list.join(", "))
+                let struct_name = to_pascal_case(&name) + "Args";
+                format!(", args: {}", struct_name)
             };
 
             self.output.push_str(&format!(
-                "    async fn {}({}) -> Result<{}, Box<dyn std::error::Error + Send + Sync>>;\n",
+                "    async fn {}(&self, ctx: &Context{}) -> SdkResult<serde_json::Value>;\n",
                 to_snake_case(&name),
-                args,
-                return_type
+                args_param
             ));
         }
 
+        self.output.push_str("}\n\n");
+    }
+
+    fn write_server_builder_ext(&mut self) {
+        self.output.push_str("/// Extension trait for type-safe resolver registration.\n");
+        self.output.push_str("pub trait ServerBuilderExt {\n");
+        self.output.push_str("    /// Register Query resolvers from a trait implementation.\n");
+        self.output.push_str("    fn query_resolvers(self, resolvers: Arc<dyn QueryResolvers>) -> Self;\n");
+        self.output.push_str("    /// Register Mutation resolvers from a trait implementation.\n");
+        self.output.push_str("    fn mutation_resolvers(self, resolvers: Arc<dyn MutationResolvers>) -> Self;\n");
+        self.output.push_str("}\n\n");
+
+        self.output.push_str("impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {\n");
+        self.output.push_str("    fn query_resolvers(mut self, resolvers: Arc<dyn QueryResolvers>) -> Self {\n");
+
+        // Find Query type and register each resolver
+        for type_def in extract_types(self.document) {
+            if let TypeDefinition::Object(obj) = type_def {
+                let name = self.interner.get(obj.name.value);
+                if name == "Query" {
+                    for field in &obj.fields {
+                        let field_name = self.interner.get(field.name.value);
+                        let snake_name = to_snake_case(&field_name);
+
+                        if field.arguments.is_empty() {
+                            self.output.push_str(&format!(
+                                "        let r = resolvers.clone();\n\
+                                 self = self.resolver(\"Query\", \"{}\", move |_args, ctx| {{\n\
+                                     let r = r.clone();\n\
+                                     async move {{ r.{}(&ctx).await }}\n\
+                                 }});\n",
+                                field_name, snake_name
+                            ));
+                        } else {
+                            let struct_name = to_pascal_case(&field_name) + "Args";
+                            self.output.push_str(&format!(
+                                "        let r = resolvers.clone();\n\
+                                 self = self.resolver(\"Query\", \"{}\", move |args, ctx| {{\n\
+                                     let r = r.clone();\n\
+                                     async move {{\n\
+                                         let parsed: {} = serde_json::from_value(args)?;\n\
+                                         r.{}(&ctx, parsed).await\n\
+                                     }}\n\
+                                 }});\n",
+                                field_name, struct_name, snake_name
+                            ));
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        self.output.push_str("        self\n");
+        self.output.push_str("    }\n\n");
+
+        self.output.push_str("    fn mutation_resolvers(mut self, resolvers: Arc<dyn MutationResolvers>) -> Self {\n");
+
+        // Find Mutation type and register each resolver
+        for type_def in extract_types(self.document) {
+            if let TypeDefinition::Object(obj) = type_def {
+                let name = self.interner.get(obj.name.value);
+                if name == "Mutation" {
+                    for field in &obj.fields {
+                        let field_name = self.interner.get(field.name.value);
+                        let snake_name = to_snake_case(&field_name);
+
+                        if field.arguments.is_empty() {
+                            self.output.push_str(&format!(
+                                "        let r = resolvers.clone();\n\
+                                 self = self.resolver(\"Mutation\", \"{}\", move |_args, ctx| {{\n\
+                                     let r = r.clone();\n\
+                                     async move {{ r.{}(&ctx).await }}\n\
+                                 }});\n",
+                                field_name, snake_name
+                            ));
+                        } else {
+                            let struct_name = to_pascal_case(&field_name) + "Args";
+                            self.output.push_str(&format!(
+                                "        let r = resolvers.clone();\n\
+                                 self = self.resolver(\"Mutation\", \"{}\", move |args, ctx| {{\n\
+                                     let r = r.clone();\n\
+                                     async move {{\n\
+                                         let parsed: {} = serde_json::from_value(args)?;\n\
+                                         r.{}(&ctx, parsed).await\n\
+                                     }}\n\
+                                 }});\n",
+                                field_name, struct_name, snake_name
+                            ));
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        self.output.push_str("        self\n");
+        self.output.push_str("    }\n");
         self.output.push_str("}\n\n");
     }
 }
@@ -579,6 +732,22 @@ fn to_snake_case(s: &str) -> String {
                 result.push('_');
             }
             result.push(c.to_lowercase().next().unwrap());
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+fn to_pascal_case(s: &str) -> String {
+    let mut result = String::new();
+    let mut capitalize_next = true;
+    for c in s.chars() {
+        if c == '_' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.push(c.to_uppercase().next().unwrap());
+            capitalize_next = false;
         } else {
             result.push(c);
         }

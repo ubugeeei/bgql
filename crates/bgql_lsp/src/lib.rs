@@ -18,6 +18,10 @@ mod symbols;
 
 use async_trait::async_trait;
 use bgql_core::Interner;
+<<<<<<< HEAD
+=======
+use bgql_semantic::{checker, hir::HirDatabase, types::TypeRegistry};
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 use bgql_syntax::{format, parse, Definition, TypeDefinition};
 use std::sync::Arc;
 use symbols::{
@@ -27,6 +31,10 @@ use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
+<<<<<<< HEAD
+=======
+#[allow(unused_imports)]
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 use tracing::info;
 
 use crate::state::ServerState;
@@ -66,7 +74,12 @@ impl BgqlLanguageServer {
         let interner = Interner::new();
         let result = parse(content, &interner);
 
+<<<<<<< HEAD
         result
+=======
+        // Collect parser diagnostics
+        let mut diagnostics: Vec<Diagnostic> = result
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
             .diagnostics
             .iter()
             .filter_map(|diag| {
@@ -87,7 +100,40 @@ impl BgqlLanguageServer {
                     ..Default::default()
                 })
             })
+<<<<<<< HEAD
             .collect()
+=======
+            .collect();
+
+        // Run type checker if no parser errors
+        if !result.diagnostics.has_errors() {
+            let types = TypeRegistry::new();
+            let hir = HirDatabase::new();
+            let check_result = checker::check(&result.document, &types, &hir, &interner);
+
+            for diag in check_result.diagnostics.iter() {
+                if let Some(span) = diag.primary_span() {
+                    let start = offset_to_position(content, span.start as usize);
+                    let end = offset_to_position(content, span.end as usize);
+
+                    diagnostics.push(Diagnostic {
+                        range: Range { start, end },
+                        severity: Some(match diag.severity {
+                            bgql_core::DiagnosticSeverity::Error => DiagnosticSeverity::ERROR,
+                            bgql_core::DiagnosticSeverity::Warning => DiagnosticSeverity::WARNING,
+                            bgql_core::DiagnosticSeverity::Info => DiagnosticSeverity::INFORMATION,
+                            bgql_core::DiagnosticSeverity::Hint => DiagnosticSeverity::HINT,
+                        }),
+                        message: diag.title.clone(),
+                        source: Some("bgql".to_string()),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+
+        diagnostics
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     }
 
     fn find_definition_location(
@@ -172,16 +218,71 @@ impl LanguageServer for BgqlLanguageServer {
                         "(".to_string(),
                         "<".to_string(),
                         " ".to_string(),
+<<<<<<< HEAD
                     ]),
                     resolve_provider: Some(false),
                     ..Default::default()
                 }),
+=======
+                        ",".to_string(),
+                    ]),
+                    resolve_provider: Some(true),
+                    ..Default::default()
+                }),
+                signature_help_provider: Some(SignatureHelpOptions {
+                    trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+                    retrigger_characters: Some(vec![",".to_string()]),
+                    work_done_progress_options: Default::default(),
+                }),
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Left(true)),
+<<<<<<< HEAD
+=======
+                semantic_tokens_provider: Some(
+                    SemanticTokensServerCapabilities::SemanticTokensOptions(
+                        SemanticTokensOptions {
+                            legend: SemanticTokensLegend {
+                                token_types: vec![
+                                    SemanticTokenType::TYPE,
+                                    SemanticTokenType::CLASS,
+                                    SemanticTokenType::ENUM,
+                                    SemanticTokenType::INTERFACE,
+                                    SemanticTokenType::STRUCT,
+                                    SemanticTokenType::TYPE_PARAMETER,
+                                    SemanticTokenType::PARAMETER,
+                                    SemanticTokenType::VARIABLE,
+                                    SemanticTokenType::PROPERTY,
+                                    SemanticTokenType::ENUM_MEMBER,
+                                    SemanticTokenType::FUNCTION,
+                                    SemanticTokenType::METHOD,
+                                    SemanticTokenType::KEYWORD,
+                                    SemanticTokenType::COMMENT,
+                                    SemanticTokenType::STRING,
+                                    SemanticTokenType::NUMBER,
+                                    SemanticTokenType::OPERATOR,
+                                    SemanticTokenType::DECORATOR,
+                                ],
+                                token_modifiers: vec![
+                                    SemanticTokenModifier::DECLARATION,
+                                    SemanticTokenModifier::DEFINITION,
+                                    SemanticTokenModifier::DEPRECATED,
+                                    SemanticTokenModifier::READONLY,
+                                ],
+                            },
+                            full: Some(SemanticTokensFullOptions::Bool(true)),
+                            range: Some(false),
+                            ..Default::default()
+                        },
+                    ),
+                ),
+                inlay_hint_provider: Some(OneOf::Left(true)),
+                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -472,6 +573,503 @@ impl LanguageServer for BgqlLanguageServer {
             ..Default::default()
         }))
     }
+<<<<<<< HEAD
+=======
+
+    async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
+        let uri = &params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+
+        let content = {
+            let state = self.state.read().await;
+            state.get_document(uri).map(|d| d.content.clone())
+        };
+
+        let Some(content) = content else {
+            return Ok(None);
+        };
+
+        let offset = position_to_offset(&content, position);
+        let signatures = get_signature_help(&content, offset);
+
+        if signatures.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(SignatureHelp {
+            signatures,
+            active_signature: Some(0),
+            active_parameter: None,
+        }))
+    }
+
+    async fn semantic_tokens_full(
+        &self,
+        params: SemanticTokensParams,
+    ) -> Result<Option<SemanticTokensResult>> {
+        let uri = &params.text_document.uri;
+
+        let content = {
+            let state = self.state.read().await;
+            state.get_document(uri).map(|d| d.content.clone())
+        };
+
+        let Some(content) = content else {
+            return Ok(None);
+        };
+
+        let interner = Interner::new();
+        let result = parse(&content, &interner);
+
+        let tokens = compute_semantic_tokens(&result.document, &content, &interner);
+
+        Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+            result_id: None,
+            data: tokens,
+        })))
+    }
+
+    async fn inlay_hint(&self, params: InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
+        let uri = &params.text_document.uri;
+
+        let content = {
+            let state = self.state.read().await;
+            state.get_document(uri).map(|d| d.content.clone())
+        };
+
+        let Some(content) = content else {
+            return Ok(None);
+        };
+
+        let interner = Interner::new();
+        let result = parse(&content, &interner);
+
+        let hints = compute_inlay_hints(&result.document, &content, &interner);
+
+        Ok(Some(hints))
+    }
+
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+        let uri = &params.text_document.uri;
+
+        let content = {
+            let state = self.state.read().await;
+            state.get_document(uri).map(|d| d.content.clone())
+        };
+
+        let Some(content) = content else {
+            return Ok(None);
+        };
+
+        let mut actions = Vec::new();
+
+        // Generate quick fixes for diagnostics
+        for diag in &params.context.diagnostics {
+            if let Some(action) = generate_quick_fix(&content, diag, uri) {
+                actions.push(CodeActionOrCommand::CodeAction(action));
+            }
+        }
+
+        if actions.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(actions))
+        }
+    }
+}
+
+// =============================================================================
+// Signature Help
+// =============================================================================
+
+fn get_signature_help(content: &str, offset: usize) -> Vec<SignatureInformation> {
+    let before = &content[..offset.min(content.len())];
+
+    // Find the directive or field call context
+    if let Some(at_pos) = before.rfind('@') {
+        let directive_text = &before[at_pos + 1..];
+        // Find directive name
+        let name_end = directive_text
+            .find(|c: char| !c.is_alphanumeric())
+            .unwrap_or(directive_text.len());
+        let directive_name = &directive_text[..name_end];
+
+        return get_directive_signatures(directive_name);
+    }
+
+    Vec::new()
+}
+
+fn get_directive_signatures(name: &str) -> Vec<SignatureInformation> {
+    match name {
+        "deprecated" => vec![SignatureInformation {
+            label: "@deprecated(reason: String)".to_string(),
+            documentation: Some(Documentation::String(
+                "Mark a field or type as deprecated".to_string(),
+            )),
+            parameters: Some(vec![ParameterInformation {
+                label: ParameterLabel::Simple("reason: String".to_string()),
+                documentation: Some(Documentation::String(
+                    "Explanation of why it's deprecated".to_string(),
+                )),
+            }]),
+            active_parameter: None,
+        }],
+        "minLength" => vec![SignatureInformation {
+            label: "@minLength(value: Int)".to_string(),
+            documentation: Some(Documentation::String(
+                "Validate minimum string length".to_string(),
+            )),
+            parameters: Some(vec![ParameterInformation {
+                label: ParameterLabel::Simple("value: Int".to_string()),
+                documentation: Some(Documentation::String("Minimum length".to_string())),
+            }]),
+            active_parameter: None,
+        }],
+        "maxLength" => vec![SignatureInformation {
+            label: "@maxLength(value: Int)".to_string(),
+            documentation: Some(Documentation::String(
+                "Validate maximum string length".to_string(),
+            )),
+            parameters: Some(vec![ParameterInformation {
+                label: ParameterLabel::Simple("value: Int".to_string()),
+                documentation: Some(Documentation::String("Maximum length".to_string())),
+            }]),
+            active_parameter: None,
+        }],
+        "min" => vec![SignatureInformation {
+            label: "@min(value: Int | Float)".to_string(),
+            documentation: Some(Documentation::String(
+                "Validate minimum numeric value".to_string(),
+            )),
+            parameters: Some(vec![ParameterInformation {
+                label: ParameterLabel::Simple("value: Int | Float".to_string()),
+                documentation: Some(Documentation::String("Minimum value".to_string())),
+            }]),
+            active_parameter: None,
+        }],
+        "max" => vec![SignatureInformation {
+            label: "@max(value: Int | Float)".to_string(),
+            documentation: Some(Documentation::String(
+                "Validate maximum numeric value".to_string(),
+            )),
+            parameters: Some(vec![ParameterInformation {
+                label: ParameterLabel::Simple("value: Int | Float".to_string()),
+                documentation: Some(Documentation::String("Maximum value".to_string())),
+            }]),
+            active_parameter: None,
+        }],
+        "pattern" => vec![SignatureInformation {
+            label: "@pattern(regex: String)".to_string(),
+            documentation: Some(Documentation::String(
+                "Validate against a regular expression".to_string(),
+            )),
+            parameters: Some(vec![ParameterInformation {
+                label: ParameterLabel::Simple("regex: String".to_string()),
+                documentation: Some(Documentation::String("Regular expression pattern".to_string())),
+            }]),
+            active_parameter: None,
+        }],
+        "hasRole" => vec![SignatureInformation {
+            label: "@hasRole(role: Role)".to_string(),
+            documentation: Some(Documentation::String(
+                "Require a specific user role".to_string(),
+            )),
+            parameters: Some(vec![ParameterInformation {
+                label: ParameterLabel::Simple("role: Role".to_string()),
+                documentation: Some(Documentation::String("Required role".to_string())),
+            }]),
+            active_parameter: None,
+        }],
+        "cacheControl" => vec![SignatureInformation {
+            label: "@cacheControl(maxAge: Int, scope: CacheScope = PUBLIC)".to_string(),
+            documentation: Some(Documentation::String("Set cache control hints".to_string())),
+            parameters: Some(vec![
+                ParameterInformation {
+                    label: ParameterLabel::Simple("maxAge: Int".to_string()),
+                    documentation: Some(Documentation::String(
+                        "Cache duration in seconds".to_string(),
+                    )),
+                },
+                ParameterInformation {
+                    label: ParameterLabel::Simple("scope: CacheScope = PUBLIC".to_string()),
+                    documentation: Some(Documentation::String(
+                        "Cache scope (PUBLIC or PRIVATE)".to_string(),
+                    )),
+                },
+            ]),
+            active_parameter: None,
+        }],
+        "defer" => vec![SignatureInformation {
+            label: "@defer(label: String, if: Boolean = true)".to_string(),
+            documentation: Some(Documentation::String(
+                "Defer field resolution for incremental delivery".to_string(),
+            )),
+            parameters: Some(vec![
+                ParameterInformation {
+                    label: ParameterLabel::Simple("label: String".to_string()),
+                    documentation: Some(Documentation::String(
+                        "Label for identifying the deferred fragment".to_string(),
+                    )),
+                },
+                ParameterInformation {
+                    label: ParameterLabel::Simple("if: Boolean = true".to_string()),
+                    documentation: Some(Documentation::String(
+                        "Condition to enable deferring".to_string(),
+                    )),
+                },
+            ]),
+            active_parameter: None,
+        }],
+        "stream" => vec![SignatureInformation {
+            label: "@stream(initialCount: Int = 0, label: String, if: Boolean = true)".to_string(),
+            documentation: Some(Documentation::String(
+                "Stream list items incrementally".to_string(),
+            )),
+            parameters: Some(vec![
+                ParameterInformation {
+                    label: ParameterLabel::Simple("initialCount: Int = 0".to_string()),
+                    documentation: Some(Documentation::String(
+                        "Number of items to include in initial response".to_string(),
+                    )),
+                },
+                ParameterInformation {
+                    label: ParameterLabel::Simple("label: String".to_string()),
+                    documentation: Some(Documentation::String(
+                        "Label for identifying the stream".to_string(),
+                    )),
+                },
+                ParameterInformation {
+                    label: ParameterLabel::Simple("if: Boolean = true".to_string()),
+                    documentation: Some(Documentation::String(
+                        "Condition to enable streaming".to_string(),
+                    )),
+                },
+            ]),
+            active_parameter: None,
+        }],
+        "rateLimit" => vec![SignatureInformation {
+            label: "@rateLimit(requests: Int, window: String)".to_string(),
+            documentation: Some(Documentation::String("Apply rate limiting".to_string())),
+            parameters: Some(vec![
+                ParameterInformation {
+                    label: ParameterLabel::Simple("requests: Int".to_string()),
+                    documentation: Some(Documentation::String(
+                        "Maximum requests allowed".to_string(),
+                    )),
+                },
+                ParameterInformation {
+                    label: ParameterLabel::Simple("window: String".to_string()),
+                    documentation: Some(Documentation::String(
+                        "Time window (e.g., \"1h\", \"1m\")".to_string(),
+                    )),
+                },
+            ]),
+            active_parameter: None,
+        }],
+        _ => Vec::new(),
+    }
+}
+
+// =============================================================================
+// Semantic Tokens
+// =============================================================================
+
+fn compute_semantic_tokens(
+    document: &bgql_syntax::Document<'_>,
+    content: &str,
+    interner: &Interner,
+) -> Vec<SemanticToken> {
+    let mut tokens = Vec::new();
+    let mut prev_line = 0u32;
+    let mut prev_start = 0u32;
+
+    for def in &document.definitions {
+        match def {
+            Definition::Type(type_def) => {
+                let (span, _name) = match type_def {
+                    TypeDefinition::Object(obj) => (obj.name.span, interner.get(obj.name.value)),
+                    TypeDefinition::Interface(iface) => {
+                        (iface.name.span, interner.get(iface.name.value))
+                    }
+                    TypeDefinition::Enum(e) => (e.name.span, interner.get(e.name.value)),
+                    TypeDefinition::Union(u) => (u.name.span, interner.get(u.name.value)),
+                    TypeDefinition::Input(i) => (i.name.span, interner.get(i.name.value)),
+                    TypeDefinition::Scalar(s) => (s.name.span, interner.get(s.name.value)),
+                    TypeDefinition::Opaque(o) => (o.name.span, interner.get(o.name.value)),
+                    TypeDefinition::TypeAlias(a) => (a.name.span, interner.get(a.name.value)),
+                    TypeDefinition::InputUnion(iu) => (iu.name.span, interner.get(iu.name.value)),
+                    TypeDefinition::InputEnum(ie) => (ie.name.span, interner.get(ie.name.value)),
+                };
+
+                let pos = offset_to_position(content, span.start as usize);
+                let length = (span.end - span.start) as u32;
+
+                let delta_line = pos.line - prev_line;
+                let delta_start = if delta_line == 0 {
+                    pos.character - prev_start
+                } else {
+                    pos.character
+                };
+
+                let token_type = match type_def {
+                    TypeDefinition::Interface(_) => 3, // INTERFACE
+                    TypeDefinition::Enum(_) => 2,     // ENUM
+                    TypeDefinition::Input(_) => 4,    // STRUCT
+                    _ => 1,                           // CLASS
+                };
+
+                tokens.push(SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type,
+                    token_modifiers_bitset: 1, // DECLARATION
+                });
+
+                prev_line = pos.line;
+                prev_start = pos.character;
+            }
+            _ => {}
+        }
+    }
+
+    tokens
+}
+
+// =============================================================================
+// Inlay Hints
+// =============================================================================
+
+fn compute_inlay_hints(
+    document: &bgql_syntax::Document<'_>,
+    content: &str,
+    interner: &Interner,
+) -> Vec<InlayHint> {
+    let mut hints = Vec::new();
+
+    for def in &document.definitions {
+        if let Definition::Type(TypeDefinition::Object(obj)) = def {
+            // Show interface count
+            if !obj.implements.is_empty() {
+                let iface_names: Vec<_> = obj
+                    .implements
+                    .iter()
+                    .map(|i| interner.get(i.value))
+                    .collect();
+                let hint_text = format!(" impl {}", iface_names.len());
+                let pos = offset_to_position(content, obj.name.span.end as usize);
+
+                hints.push(InlayHint {
+                    position: pos,
+                    label: InlayHintLabel::String(hint_text),
+                    kind: Some(InlayHintKind::TYPE),
+                    text_edits: None,
+                    tooltip: Some(InlayHintTooltip::String(format!(
+                        "Implements: {}",
+                        iface_names.join(", ")
+                    ))),
+                    padding_left: Some(true),
+                    padding_right: None,
+                    data: None,
+                });
+            }
+
+            // Show field count
+            if obj.fields.len() > 3 {
+                let hint_text = format!(" {} fields", obj.fields.len());
+                // Position after the opening brace - find it
+                let obj_text = &content[obj.span.start as usize..obj.span.end as usize];
+                if let Some(brace_pos) = obj_text.find('{') {
+                    let abs_pos = obj.span.start as usize + brace_pos + 1;
+                    let pos = offset_to_position(content, abs_pos);
+                    hints.push(InlayHint {
+                        position: pos,
+                        label: InlayHintLabel::String(hint_text),
+                        kind: Some(InlayHintKind::TYPE),
+                        text_edits: None,
+                        tooltip: None,
+                        padding_left: Some(true),
+                        padding_right: None,
+                        data: None,
+                    });
+                }
+            }
+        }
+    }
+
+    hints
+}
+
+// =============================================================================
+// Code Actions (Quick Fixes)
+// =============================================================================
+
+fn generate_quick_fix(
+    content: &str,
+    diagnostic: &Diagnostic,
+    uri: &Url,
+) -> Option<CodeAction> {
+    // Check for "Undefined type" errors - suggest adding the type
+    if diagnostic.message.contains("Undefined type") {
+        // Extract the type name from the message
+        if let Some(start) = diagnostic.message.find('`') {
+            if let Some(end) = diagnostic.message[start + 1..].find('`') {
+                let type_name = &diagnostic.message[start + 1..start + 1 + end];
+
+                // Create a quick fix to add the type definition
+                let insert_text = format!("\ntype {} {{\n  \n}}\n", type_name);
+
+                // Find the end of the document
+                let lines: Vec<_> = content.lines().collect();
+                let end_line = lines.len() as u32;
+
+                let mut changes = std::collections::HashMap::new();
+                changes.insert(
+                    uri.clone(),
+                    vec![TextEdit {
+                        range: Range {
+                            start: Position::new(end_line, 0),
+                            end: Position::new(end_line, 0),
+                        },
+                        new_text: insert_text,
+                    }],
+                );
+
+                return Some(CodeAction {
+                    title: format!("Create type `{}`", type_name),
+                    kind: Some(CodeActionKind::QUICKFIX),
+                    diagnostics: Some(vec![diagnostic.clone()]),
+                    edit: Some(WorkspaceEdit {
+                        changes: Some(changes),
+                        ..Default::default()
+                    }),
+                    is_preferred: Some(true),
+                    ..Default::default()
+                });
+            }
+        }
+    }
+
+    // Check for "Missing field" errors - suggest adding the field
+    if diagnostic.message.contains("Missing field") {
+        if let Some(start) = diagnostic.message.find('`') {
+            if let Some(end) = diagnostic.message[start + 1..].find('`') {
+                let field_name = &diagnostic.message[start + 1..start + 1 + end];
+
+                return Some(CodeAction {
+                    title: format!("Add field `{}`", field_name),
+                    kind: Some(CodeActionKind::QUICKFIX),
+                    diagnostics: Some(vec![diagnostic.clone()]),
+                    // Note: actual edit would need more context about the interface
+                    ..Default::default()
+                });
+            }
+        }
+    }
+
+    None
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 /// Runs the language server.

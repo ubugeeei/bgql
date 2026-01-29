@@ -25,10 +25,34 @@ export type {
   UseQueryResult,
   UseServerFragmentResult,
   UseBinaryStreamResult,
+<<<<<<< HEAD
 } from './types';
 
 // Composables
 export { useQuery } from './useQuery';
+=======
+  RequestOptions,
+} from './types';
+
+// Composables
+export {
+  useQuery,
+  BGQL_CLIENT_KEY,
+  BGQL_SSR_CONTEXT_KEY,
+  type UseQueryOptions,
+} from './useQuery';
+export {
+  useMutation,
+  type MutationOptions,
+  type UseMutationResult,
+} from './useMutation';
+export {
+  useSubscription,
+  type SubscriptionOptions,
+  type SubscriptionStatus,
+  type UseSubscriptionResult,
+} from './useSubscription';
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 export {
   useServerFragment,
   useServerFragmentAsync,
@@ -56,6 +80,13 @@ export {
   createTypedDefer,
   createTypedStream,
   BGQL_QUERY_CONTEXT_KEY,
+<<<<<<< HEAD
+=======
+  // Provider utilities
+  createClientProvider,
+  createSSRContext as createProviderSSRContext,
+  type SSRContext,
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 } from './components';
 
 // Vite Plugin

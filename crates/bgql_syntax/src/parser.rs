@@ -182,7 +182,13 @@ impl<'a> Parser<'a> {
             | TokenKind::Subscription
             | TokenKind::LBrace => Some(Definition::Operation(self.parse_operation())),
             TokenKind::Fragment => Some(Definition::Fragment(self.parse_fragment_definition())),
+<<<<<<< HEAD
             TokenKind::Mod => Some(Definition::Module(self.parse_module_declaration(visibility))),
+=======
+            TokenKind::Mod => Some(Definition::Module(
+                self.parse_module_declaration(visibility),
+            )),
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
             TokenKind::Use => Some(Definition::Use(self.parse_use_statement(visibility))),
             _ => {
                 self.error("expected definition");
@@ -361,12 +367,22 @@ impl<'a> Parser<'a> {
 
     /// Peeks at the next token kind.
     fn peek_next(&mut self) -> TokenKind {
+<<<<<<< HEAD
         let _saved_pos = self.lexer.pos();
         let saved_current = self.current;
         self.advance();
         let next = self.at();
         // Restore - hacky but works
         self.current = saved_current;
+=======
+        let saved_pos = self.lexer.pos();
+        let saved_current = self.current;
+        self.advance();
+        let next = self.at();
+        // Restore both the current token and lexer position
+        self.current = saved_current;
+        self.lexer.set_pos(saved_pos);
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         next
     }
 
@@ -457,6 +473,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+<<<<<<< HEAD
     /// Parses object type definition (legacy, no visibility).
     fn parse_object_type(
         &mut self,
@@ -465,6 +482,8 @@ impl<'a> Parser<'a> {
         self.parse_object_type_with_visibility(description, Visibility::Private)
     }
 
+=======
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Parses object type definition with visibility.
     fn parse_object_type_with_visibility(
         &mut self,
@@ -496,6 +515,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+<<<<<<< HEAD
     /// Parses interface type definition (legacy, no visibility).
     fn parse_interface_type(
         &mut self,
@@ -504,6 +524,8 @@ impl<'a> Parser<'a> {
         self.parse_interface_type_with_visibility(description, Visibility::Private)
     }
 
+=======
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Parses interface type definition with visibility.
     fn parse_interface_type_with_visibility(
         &mut self,
@@ -535,6 +557,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+<<<<<<< HEAD
     /// Parses union type definition (legacy, no visibility).
     fn parse_union_type(
         &mut self,
@@ -543,6 +566,8 @@ impl<'a> Parser<'a> {
         self.parse_union_type_with_visibility(description, Visibility::Private)
     }
 
+=======
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Parses union type definition with visibility.
     fn parse_union_type_with_visibility(
         &mut self,
@@ -578,11 +603,14 @@ impl<'a> Parser<'a> {
         }
     }
 
+<<<<<<< HEAD
     /// Parses enum type definition (legacy, no visibility).
     fn parse_enum_type(&mut self, description: Option<Description<'a>>) -> EnumTypeDefinition<'a> {
         self.parse_enum_type_with_visibility(description, Visibility::Private)
     }
 
+=======
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Parses enum type definition with visibility.
     fn parse_enum_type_with_visibility(
         &mut self,
@@ -668,6 +696,7 @@ impl<'a> Parser<'a> {
         values
     }
 
+<<<<<<< HEAD
     /// Parses input object type definition (legacy, no visibility).
     fn parse_input_object_type(
         &mut self,
@@ -676,6 +705,8 @@ impl<'a> Parser<'a> {
         self.parse_input_object_type_with_visibility(description, Visibility::Private)
     }
 
+=======
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Parses input object type definition with visibility.
     fn parse_input_object_type_with_visibility(
         &mut self,
@@ -703,6 +734,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+<<<<<<< HEAD
     /// Parses scalar type definition (legacy, no visibility).
     fn parse_scalar_type(
         &mut self,
@@ -711,6 +743,8 @@ impl<'a> Parser<'a> {
         self.parse_scalar_type_with_visibility(description, Visibility::Private)
     }
 
+=======
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Parses scalar type definition with visibility.
     fn parse_scalar_type_with_visibility(
         &mut self,
@@ -733,6 +767,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+<<<<<<< HEAD
     /// Parses opaque type definition (legacy, no visibility).
     fn parse_opaque_type(
         &mut self,
@@ -741,6 +776,8 @@ impl<'a> Parser<'a> {
         self.parse_opaque_type_with_visibility(description, Visibility::Private)
     }
 
+=======
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Parses opaque type definition with visibility.
     fn parse_opaque_type_with_visibility(
         &mut self,
@@ -787,6 +824,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+<<<<<<< HEAD
     /// Parses input union type definition (legacy, no visibility).
     fn parse_input_union_type(
         &mut self,
@@ -795,6 +833,8 @@ impl<'a> Parser<'a> {
         self.parse_input_union_type_with_visibility(description, Visibility::Private)
     }
 
+=======
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Parses input union type definition with visibility.
     fn parse_input_union_type_with_visibility(
         &mut self,
@@ -831,6 +871,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+<<<<<<< HEAD
     /// Parses input enum type definition (legacy, no visibility).
     fn parse_input_enum_type(
         &mut self,
@@ -839,6 +880,8 @@ impl<'a> Parser<'a> {
         self.parse_input_enum_type_with_visibility(description, Visibility::Private)
     }
 
+=======
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Parses input enum type definition with visibility.
     fn parse_input_enum_type_with_visibility(
         &mut self,
@@ -1704,6 +1747,7 @@ mod tests {
         let result = parse("use::external::User as ExternalUser", &interner);
         assert!(!result.diagnostics.has_errors());
         match &result.document.definitions[0] {
+<<<<<<< HEAD
             Definition::Use(u) => {
                 match &u.items {
                     UseItems::Named(items) => {
@@ -1713,6 +1757,15 @@ mod tests {
                     _ => panic!("expected named items with alias"),
                 }
             }
+=======
+            Definition::Use(u) => match &u.items {
+                UseItems::Named(items) => {
+                    assert_eq!(items.len(), 1);
+                    assert!(items[0].alias.is_some());
+                }
+                _ => panic!("expected named items with alias"),
+            },
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
             _ => panic!("expected use statement"),
         }
     }

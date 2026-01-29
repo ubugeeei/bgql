@@ -28,6 +28,15 @@ impl<'a> Lexer<'a> {
         self.pos
     }
 
+<<<<<<< HEAD
+=======
+    /// Sets the current position (for lookahead restoration).
+    #[inline]
+    pub fn set_pos(&mut self, pos: u32) {
+        self.pos = pos;
+    }
+
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Peeks at the current byte without consuming.
     #[inline]
     fn peek(&self) -> Option<u8> {

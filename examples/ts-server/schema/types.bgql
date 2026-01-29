@@ -1,0 +1,122 @@
+# Core Types Module
+#
+# Defines opaque types, enums, and domain objects
+
+# ============================================
+# Opaque Types (Nominal typing for ID safety)
+# ============================================
+
+pub opaque UserId = ID
+pub opaque PostId = ID
+pub opaque CommentId = ID
+
+# ============================================
+# Enums
+# ============================================
+
+pub enum UserRole {
+  Admin
+  Moderator
+  User
+  Guest
+}
+
+pub enum PostStatus {
+  Draft
+  Published
+  Archived
+}
+
+pub enum OAuthProvider {
+  Google
+  GitHub
+  Apple
+}
+
+# ============================================
+# Domain Objects
+# ============================================
+
+pub type User {
+  id: UserId
+  name: String
+  email: String
+  bio: Option<String>
+  avatarUrl: Option<String>
+  role: UserRole
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+
+  # Resolved fields
+  posts: List<Post>
+  analytics: UserAnalytics @defer(label: "userAnalytics")
+}
+
+pub type Post {
+  id: PostId
+  title: String
+  content: String
+  authorId: UserId
+  status: PostStatus
+  publishedAt: Option<DateTime>
+  createdAt: DateTime
+
+  # Resolved fields
+  author: Option<User>
+  comments: List<Comment> @stream(initialCount: 5)
+}
+
+pub type Comment {
+  id: CommentId
+  content: String
+  authorId: UserId
+  postId: PostId
+  createdAt: DateTime
+}
+
+pub type UserAnalytics {
+  totalPosts: Uint
+  totalComments: Uint
+  totalLikes: Uint
+}
+
+# ============================================
+# Connection Types (Generic pagination)
+# ============================================
+
+pub type Connection<T extends Node> {
+  edges: List<Edge<T>>
+  pageInfo: PageInfo
+  totalCount: Uint
+}
+
+pub type Edge<T> {
+  node: T
+  cursor: String
+}
+
+pub type PageInfo {
+  hasNextPage: Boolean
+  hasPreviousPage: Boolean
+  startCursor: Option<String>
+  endCursor: Option<String>
+}
+
+# Node interface for relay-style connections
+pub interface Node {
+  id: ID
+}
+
+# Implement Node for types
+extend type User implements Node
+extend type Post implements Node
+
+# ============================================
+# Auth Types
+# ============================================
+
+pub type AuthPayload {
+  token: String
+  user: User
+  expiresAt: DateTime
+}

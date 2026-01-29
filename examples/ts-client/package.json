@@ -1,0 +1,19 @@
+{
+  "name": "@bgql/example-ts-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/main.ts",
+    "start": "bun src/main.ts",
+    "typecheck": "tsgo --noEmit",
+    "codegen": "bgql codegen --lang typescript ../ts-server/schema/mod.bgql -o src/generated/types.ts"
+  },
+  "dependencies": {
+    "@bgql/client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@typescript/native-preview": "latest"
+  }
+}

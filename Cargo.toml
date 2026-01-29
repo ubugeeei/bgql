@@ -6,11 +6,13 @@ members = [
     "crates/bgql_semantic",
     "crates/bgql_resolver",
     "crates/bgql_runtime",
-    "crates/bgql_sdk",
+    "crates/bgql_macros",
     "crates/bgql_codegen",
     "crates/bgql_lsp",
     "crates/bgql_wasm",
     "crates/bgql_cli",
+    "sdk/rust",
+    "examples/rust-server",
 ]
 
 [workspace.package]
@@ -71,10 +73,12 @@ bgql_syntax = { path = "crates/bgql_syntax" }
 bgql_semantic = { path = "crates/bgql_semantic" }
 bgql_resolver = { path = "crates/bgql_resolver" }
 bgql_runtime = { path = "crates/bgql_runtime" }
-bgql_sdk = { path = "crates/bgql_sdk" }
+bgql_sdk = { path = "sdk/rust" }
 bgql_lsp = { path = "crates/bgql_lsp" }
 bgql_wasm = { path = "crates/bgql_wasm" }
 bgql_cli = { path = "crates/bgql_cli" }
+bgql_macros = { path = "crates/bgql_macros" }
+bgql_codegen = { path = "crates/bgql_codegen" }
 
 [workspace.lints.rust]
 unsafe_code = "warn"

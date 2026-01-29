@@ -1,0 +1,19 @@
+# BGQL Example Schema - Root Module
+#
+# Demonstrates bgql module system:
+# - `mod` for module declarations
+# - `use` for imports
+# - `pub` for visibility
+
+mod types
+mod errors
+mod inputs
+mod queries
+mod mutations
+
+# Re-export public types
+pub use types::*
+pub use errors::*
+pub use inputs::*
+pub use queries::*
+pub use mutations::*

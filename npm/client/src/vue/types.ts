@@ -4,7 +4,16 @@
  * Framework-agnostic component model with streaming support.
  */
 
+<<<<<<< HEAD
 import type { GraphQLResponse, RequestOptions } from '../types';
+=======
+import type { GraphQLResponse, RequestOptions as CoreRequestOptions } from '../types';
+
+/**
+ * Re-export RequestOptions for use in Vue composables.
+ */
+export type RequestOptions = CoreRequestOptions;
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
 /**
  * Document node type (compatible with graphql-tag and gql)

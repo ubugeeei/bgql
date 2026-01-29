@@ -1,8 +1,17 @@
 //! TypeScript code generator.
 
+<<<<<<< HEAD
 use crate::{extract_types, CodegenOptions, TypeConverter};
 use bgql_core::Interner;
 use bgql_syntax::{Document, FieldDefinition, InputValueDefinition, Type, TypeDefinition};
+=======
+use crate::{extract_operations, extract_types, CodegenOptions, TypeConverter};
+use bgql_core::Interner;
+use bgql_syntax::{
+    Directive, Document, FieldDefinition, InputValueDefinition, OperationDefinition,
+    OperationType, Selection, Type, TypeDefinition,
+};
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
 /// TypeScript code generator.
 pub struct TypeScriptGenerator<'a> {
@@ -29,9 +38,21 @@ impl<'a> TypeScriptGenerator<'a> {
     pub fn generate(mut self) -> String {
         self.write_header();
         self.write_imports();
+<<<<<<< HEAD
         self.write_scalars();
         self.write_types();
 
+=======
+        self.write_utility_types();
+        self.write_typed_document_node();
+        self.write_scalars();
+        self.write_types();
+
+        if self.options.operations {
+            self.write_operations();
+        }
+
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         if self.options.client {
             self.write_client_sdk();
         }
@@ -69,6 +90,250 @@ impl<'a> TypeScriptGenerator<'a> {
         }
     }
 
+<<<<<<< HEAD
+=======
+    fn write_utility_types(&mut self) {
+        self.output.push_str(
+            "// =============================================================================\n",
+        );
+        self.output.push_str("// Utility Types\n");
+        self.output.push_str(
+            "// =============================================================================\n\n",
+        );
+
+        // Re-export built-in utility types for convenience
+        self.output.push_str("/** Makes all properties in T optional */\n");
+        self.output
+            .push_str("export type BgqlPartial<T> = Partial<T>;\n\n");
+
+        self.output.push_str("/** Makes all properties in T required */\n");
+        self.output
+            .push_str("export type BgqlRequired<T> = Required<T>;\n\n");
+
+        self.output.push_str("/** From T, pick a set of properties whose keys are in K */\n");
+        self.output
+            .push_str("export type BgqlPick<T, K extends keyof T> = Pick<T, K>;\n\n");
+
+        self.output.push_str("/** Construct a type with properties of T except for those in K */\n");
+        self.output
+            .push_str("export type BgqlOmit<T, K extends keyof T> = Omit<T, K>;\n\n");
+
+        // assertNever helper for exhaustiveness checking
+        self.output
+            .push_str("/** Helper for exhaustiveness checking in switch statements */\n");
+        self.output
+            .push_str("export function assertNever(value: never): never {\n");
+        self.output.push_str(
+            "  throw new Error(`Unexpected value: ${JSON.stringify(value)}`);\n",
+        );
+        self.output.push_str("}\n\n");
+
+        // Exact type helper (prevents excess properties)
+        self.output
+            .push_str("/** Exact type helper - prevents excess properties */\n");
+        self.output.push_str(
+            "export type Exact<T, Shape> = T extends Shape ? (Exclude<keyof T, keyof Shape> extends never ? T : never) : never;\n\n",
+        );
+
+        // DeepReadonly type helper
+        self.output
+            .push_str("/** Deep readonly type helper */\n");
+        self.output.push_str(
+            "export type DeepReadonly<T> = T extends (infer U)[] ? ReadonlyArray<DeepReadonly<U>> : T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T;\n\n",
+        );
+
+        // Maybe type for nullable fields
+        self.output
+            .push_str("/** Maybe type - represents a nullable value */\n");
+        self.output.push_str("export type Maybe<T> = T | null;\n\n");
+
+        // InputMaybe type for nullable input values (null or undefined)
+        self.output
+            .push_str("/** InputMaybe type - represents an optional nullable input value */\n");
+        self.output
+            .push_str("export type InputMaybe<T> = T | null | undefined;\n\n");
+    }
+
+    fn write_typed_document_node(&mut self) {
+        self.output.push_str(
+            "// =============================================================================\n",
+        );
+        self.output.push_str("// TypedDocumentNode Support\n");
+        self.output.push_str(
+            "// =============================================================================\n\n",
+        );
+
+        // DocumentNode type (minimal representation)
+        self.output
+            .push_str("/** Represents a parsed GraphQL document */\n");
+        self.output.push_str("export interface DocumentNode {\n");
+        self.output.push_str("  readonly kind: 'Document';\n");
+        self.output
+            .push_str("  readonly definitions: ReadonlyArray<DefinitionNode>;\n");
+        self.output.push_str("}\n\n");
+
+        // DefinitionNode type
+        self.output.push_str("/** Represents a definition in a GraphQL document */\n");
+        self.output.push_str("export interface DefinitionNode {\n");
+        self.output.push_str("  readonly kind: string;\n");
+        self.output.push_str("}\n\n");
+
+        // OperationDefinitionNode type
+        self.output
+            .push_str("/** Represents an operation definition in a GraphQL document */\n");
+        self.output
+            .push_str("export interface OperationDefinitionNode extends DefinitionNode {\n");
+        self.output
+            .push_str("  readonly kind: 'OperationDefinition';\n");
+        self.output
+            .push_str("  readonly operation: 'query' | 'mutation' | 'subscription';\n");
+        self.output.push_str("  readonly name?: { readonly kind: 'Name'; readonly value: string };\n");
+        self.output
+            .push_str("  readonly variableDefinitions?: ReadonlyArray<VariableDefinitionNode>;\n");
+        self.output
+            .push_str("  readonly selectionSet: SelectionSetNode;\n");
+        self.output.push_str("}\n\n");
+
+        // VariableDefinitionNode type
+        self.output
+            .push_str("/** Represents a variable definition in an operation */\n");
+        self.output.push_str("export interface VariableDefinitionNode {\n");
+        self.output
+            .push_str("  readonly kind: 'VariableDefinition';\n");
+        self.output
+            .push_str("  readonly variable: { readonly kind: 'Variable'; readonly name: { readonly kind: 'Name'; readonly value: string } };\n");
+        self.output.push_str("  readonly type: TypeNode;\n");
+        self.output.push_str("}\n\n");
+
+        // TypeNode type
+        self.output.push_str("/** Represents a type reference in GraphQL */\n");
+        self.output.push_str(
+            "export type TypeNode = NamedTypeNode | ListTypeNode | NonNullTypeNode;\n\n",
+        );
+
+        self.output.push_str("export interface NamedTypeNode {\n");
+        self.output.push_str("  readonly kind: 'NamedType';\n");
+        self.output
+            .push_str("  readonly name: { readonly kind: 'Name'; readonly value: string };\n");
+        self.output.push_str("}\n\n");
+
+        self.output.push_str("export interface ListTypeNode {\n");
+        self.output.push_str("  readonly kind: 'ListType';\n");
+        self.output.push_str("  readonly type: TypeNode;\n");
+        self.output.push_str("}\n\n");
+
+        self.output.push_str("export interface NonNullTypeNode {\n");
+        self.output.push_str("  readonly kind: 'NonNullType';\n");
+        self.output
+            .push_str("  readonly type: NamedTypeNode | ListTypeNode;\n");
+        self.output.push_str("}\n\n");
+
+        // SelectionSetNode type
+        self.output
+            .push_str("/** Represents a selection set in a GraphQL operation */\n");
+        self.output.push_str("export interface SelectionSetNode {\n");
+        self.output.push_str("  readonly kind: 'SelectionSet';\n");
+        self.output
+            .push_str("  readonly selections: ReadonlyArray<SelectionNode>;\n");
+        self.output.push_str("}\n\n");
+
+        // SelectionNode type
+        self.output.push_str("/** Represents a selection in a selection set */\n");
+        self.output.push_str(
+            "export type SelectionNode = FieldNode | FragmentSpreadNode | InlineFragmentNode;\n\n",
+        );
+
+        self.output.push_str("export interface FieldNode {\n");
+        self.output.push_str("  readonly kind: 'Field';\n");
+        self.output.push_str("  readonly alias?: { readonly kind: 'Name'; readonly value: string };\n");
+        self.output
+            .push_str("  readonly name: { readonly kind: 'Name'; readonly value: string };\n");
+        self.output.push_str("  readonly arguments?: ReadonlyArray<ArgumentNode>;\n");
+        self.output.push_str("  readonly selectionSet?: SelectionSetNode;\n");
+        self.output.push_str("}\n\n");
+
+        self.output.push_str("export interface FragmentSpreadNode {\n");
+        self.output.push_str("  readonly kind: 'FragmentSpread';\n");
+        self.output
+            .push_str("  readonly name: { readonly kind: 'Name'; readonly value: string };\n");
+        self.output.push_str("}\n\n");
+
+        self.output.push_str("export interface InlineFragmentNode {\n");
+        self.output.push_str("  readonly kind: 'InlineFragment';\n");
+        self.output.push_str("  readonly typeCondition?: NamedTypeNode;\n");
+        self.output.push_str("  readonly selectionSet: SelectionSetNode;\n");
+        self.output.push_str("}\n\n");
+
+        self.output.push_str("export interface ArgumentNode {\n");
+        self.output.push_str("  readonly kind: 'Argument';\n");
+        self.output
+            .push_str("  readonly name: { readonly kind: 'Name'; readonly value: string };\n");
+        self.output.push_str("  readonly value: ValueNode;\n");
+        self.output.push_str("}\n\n");
+
+        self.output.push_str("/** Represents a value in GraphQL */\n");
+        self.output.push_str("export type ValueNode =\n");
+        self.output.push_str("  | { readonly kind: 'Variable'; readonly name: { readonly kind: 'Name'; readonly value: string } }\n");
+        self.output.push_str("  | { readonly kind: 'IntValue'; readonly value: string }\n");
+        self.output.push_str("  | { readonly kind: 'FloatValue'; readonly value: string }\n");
+        self.output.push_str("  | { readonly kind: 'StringValue'; readonly value: string }\n");
+        self.output.push_str("  | { readonly kind: 'BooleanValue'; readonly value: boolean }\n");
+        self.output.push_str("  | { readonly kind: 'NullValue' }\n");
+        self.output.push_str("  | { readonly kind: 'EnumValue'; readonly value: string }\n");
+        self.output.push_str(
+            "  | { readonly kind: 'ListValue'; readonly values: ReadonlyArray<ValueNode> }\n",
+        );
+        self.output.push_str("  | { readonly kind: 'ObjectValue'; readonly fields: ReadonlyArray<{ readonly kind: 'ObjectField'; readonly name: { readonly kind: 'Name'; readonly value: string }; readonly value: ValueNode }> };\n\n");
+
+        // TypedDocumentNode interface
+        self.output.push_str(
+            "/**\n * TypedDocumentNode - A DocumentNode with type information for variables and data.\n * This enables full type inference when using GraphQL clients.\n */\n",
+        );
+        self.output.push_str(
+            "export interface TypedDocumentNode<TData = unknown, TVariables = Record<string, unknown>> extends DocumentNode {\n",
+        );
+        self.output.push_str(
+            "  /** This field is used only for type inference and is never actually set at runtime */\n",
+        );
+        self.output
+            .push_str("  readonly __apiType?: (variables: TVariables) => TData;\n");
+        self.output.push_str("  /** Additional type brand for stricter type checking */\n");
+        self.output
+            .push_str("  readonly __resultType?: TData;\n");
+        self.output
+            .push_str("  readonly __variablesType?: TVariables;\n");
+        self.output.push_str("}\n\n");
+
+        // Helper types for extracting Data and Variables from TypedDocumentNode
+        self.output.push_str("/** Extract the data type from a TypedDocumentNode */\n");
+        self.output.push_str(
+            "export type ResultOf<T> = T extends TypedDocumentNode<infer Data, any> ? Data : never;\n\n",
+        );
+
+        self.output.push_str("/** Extract the variables type from a TypedDocumentNode */\n");
+        self.output.push_str(
+            "export type VariablesOf<T> = T extends TypedDocumentNode<any, infer Vars> ? Vars : never;\n\n",
+        );
+
+        // Helper for making document nodes
+        self.output.push_str("/** Helper type to create a typed document from raw string */\n");
+        self.output.push_str(
+            "export type TypedDocumentString<TData, TVariables> = string & TypedDocumentNode<TData, TVariables>;\n\n",
+        );
+
+        // Fragment mask helpers for fragment type safety
+        self.output.push_str("/** Fragment reference type for masked fragments */\n");
+        self.output.push_str(
+            "export type FragmentType<T> = { readonly ' $fragmentRefs'?: T };\n\n",
+        );
+
+        self.output.push_str("/** Helper to unmask fragment data */\n");
+        self.output.push_str(
+            "export type Unmasked<T> = T extends FragmentType<infer U> ? U : T;\n\n",
+        );
+    }
+
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     fn write_scalars(&mut self) {
         self.output.push_str(
             "// =============================================================================\n",
@@ -83,6 +348,12 @@ impl<'a> TypeScriptGenerator<'a> {
         self.output.push_str("export type Boolean = boolean;\n");
         self.output.push_str("export type String = string;\n");
         self.output.push_str("export type DateTime = string;\n");
+<<<<<<< HEAD
+=======
+        self.output.push_str("export type Date = string;\n");
+        self.output.push_str("export type Uint = number;\n");
+        self.output.push_str("export type Void = void;\n");
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         self.output
             .push_str("export type JSON = Record<string, unknown>;\n\n");
     }
@@ -115,9 +386,20 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_object_type(&mut self, obj: &bgql_syntax::ObjectTypeDefinition<'_>) {
         let name = self.interner.get(obj.name.value);
 
+<<<<<<< HEAD
         // Write description if present
         if let Some(desc) = &obj.description {
             self.write_jsdoc(desc.value);
+=======
+        // Check for @deprecated directive
+        let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&obj.directives);
+
+        // Write description if present
+        if let Some(desc) = &obj.description {
+            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+        } else if is_deprecated {
+            self.write_deprecated_jsdoc(deprecation_reason.as_deref());
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         // Write interface
@@ -151,8 +433,18 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_interface_type(&mut self, iface: &bgql_syntax::InterfaceTypeDefinition<'_>) {
         let name = self.interner.get(iface.name.value);
 
+<<<<<<< HEAD
         if let Some(desc) = &iface.description {
             self.write_jsdoc(desc.value);
+=======
+        // Check for @deprecated directive
+        let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&iface.directives);
+
+        if let Some(desc) = &iface.description {
+            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+        } else if is_deprecated {
+            self.write_deprecated_jsdoc(deprecation_reason.as_deref());
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         self.output
@@ -168,8 +460,18 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_enum_type(&mut self, e: &bgql_syntax::EnumTypeDefinition<'_>) {
         let name = self.interner.get(e.name.value);
 
+<<<<<<< HEAD
         if let Some(desc) = &e.description {
             self.write_jsdoc(desc.value);
+=======
+        // Check for @deprecated directive
+        let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&e.directives);
+
+        if let Some(desc) = &e.description {
+            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+        } else if is_deprecated {
+            self.write_deprecated_jsdoc(deprecation_reason.as_deref());
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         // Check if any values have data (Rust-style enum)
@@ -179,6 +481,7 @@ impl<'a> TypeScriptGenerator<'a> {
             // Generate discriminated union for Rust-style enums
             self.write_rust_style_enum(e);
         } else {
+<<<<<<< HEAD
             // Simple string union
             let values: Vec<_> = e
                 .values
@@ -199,6 +502,52 @@ impl<'a> TypeScriptGenerator<'a> {
                 self.output.push_str(&format!("  {}: '{}',\n", val, val));
             }
             self.output.push_str("} as const;\n\n");
+=======
+            // Generate const object first for exact type inference
+            self.output
+                .push_str(&format!("/** Enum values for {} */\n", name));
+            self.output
+                .push_str(&format!("export const {}Values = {{\n", name));
+            for value in &e.values {
+                let val = self.interner.get(value.name.value);
+                // Check for @deprecated directive on enum value
+                let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&value.directives);
+                if is_deprecated {
+                    if let Some(reason) = &deprecation_reason {
+                        self.output.push_str(&format!("  /** @deprecated {} */\n", reason));
+                    } else {
+                        self.output.push_str("  /** @deprecated */\n");
+                    }
+                }
+                self.output.push_str(&format!("  {}: '{}',\n", val, val));
+            }
+            self.output.push_str("} as const;\n\n");
+
+            // Generate type from const object for strict inference
+            self.output.push_str(&format!(
+                "/** {} enum type - use {}Values for runtime access */\n",
+                name, name
+            ));
+            self.output.push_str(&format!(
+                "export type {} = typeof {}Values[keyof typeof {}Values];\n\n",
+                name, name, name
+            ));
+
+            // Generate type guard
+            self.output.push_str(&format!(
+                "/** Type guard for {} */\n",
+                name
+            ));
+            self.output.push_str(&format!(
+                "export function is{}(value: unknown): value is {} {{\n",
+                name, name
+            ));
+            self.output.push_str(&format!(
+                "  return Object.values({}Values).includes(value as {});\n",
+                name, name
+            ));
+            self.output.push_str("}\n\n");
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
     }
 
@@ -282,27 +631,69 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_union_type(&mut self, u: &bgql_syntax::UnionTypeDefinition<'_>) {
         let name = self.interner.get(u.name.value);
 
+<<<<<<< HEAD
         if let Some(desc) = &u.description {
             self.write_jsdoc(desc.value);
+=======
+        // Check for @deprecated directive
+        let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&u.directives);
+
+        if let Some(desc) = &u.description {
+            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+        } else if is_deprecated {
+            self.write_deprecated_jsdoc(deprecation_reason.as_deref());
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         let members: Vec<_> = u
             .members
             .iter()
+<<<<<<< HEAD
             .map(|m| self.interner.get(m.value))
+=======
+            .map(|m| self.interner.get(m.value).to_string())
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
             .collect();
         self.output.push_str(&format!(
             "export type {} = {};\n\n",
             name,
             members.join(" | ")
         ));
+<<<<<<< HEAD
+=======
+
+        // Generate type guards for discriminated unions
+        self.output
+            .push_str(&format!("export const {} = {{\n", name));
+        for member in &members {
+            self.output.push_str(&format!(
+                "  /** Type guard for {} */\n",
+                member
+            ));
+            self.output.push_str(&format!(
+                "  is{}: (value: {}): value is {} => value.__typename === '{}',\n",
+                member, name, member, member
+            ));
+        }
+        self.output.push_str("} as const;\n\n");
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     }
 
     fn write_input_type(&mut self, inp: &bgql_syntax::InputObjectTypeDefinition<'_>) {
         let name = self.interner.get(inp.name.value);
 
+<<<<<<< HEAD
         if let Some(desc) = &inp.description {
             self.write_jsdoc(desc.value);
+=======
+        // Check for @deprecated directive
+        let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&inp.directives);
+
+        if let Some(desc) = &inp.description {
+            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+        } else if is_deprecated {
+            self.write_deprecated_jsdoc(deprecation_reason.as_deref());
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         self.output
@@ -318,8 +709,18 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_scalar_type(&mut self, s: &bgql_syntax::ScalarTypeDefinition<'_>) {
         let name = self.interner.get(s.name.value);
 
+<<<<<<< HEAD
         if let Some(desc) = &s.description {
             self.write_jsdoc(desc.value);
+=======
+        // Check for @deprecated directive
+        let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&s.directives);
+
+        if let Some(desc) = &s.description {
+            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+        } else if is_deprecated {
+            self.write_deprecated_jsdoc(deprecation_reason.as_deref());
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         // Custom scalars map to unknown by default
@@ -437,8 +838,35 @@ impl<'a> TypeScriptGenerator<'a> {
         let ts_type = self.convert_type(&field.ty, self.interner);
         let optional = self.is_optional(&field.ty);
 
+<<<<<<< HEAD
         if let Some(desc) = &field.description {
             self.output.push_str(&format!("  /** {} */\n", desc.value));
+=======
+        // Check for @deprecated directive
+        let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&field.directives);
+
+        if let Some(desc) = &field.description {
+            if is_deprecated {
+                self.output.push_str("  /**\n");
+                self.output.push_str(&format!("   * {}\n", desc.value));
+                if let Some(reason) = &deprecation_reason {
+                    self.output.push_str(&format!("   * @deprecated {}\n", reason));
+                } else {
+                    self.output.push_str("   * @deprecated\n");
+                }
+                self.output.push_str("   */\n");
+            } else {
+                self.output.push_str(&format!("  /** {} */\n", desc.value));
+            }
+        } else if is_deprecated {
+            self.output.push_str("  /**\n");
+            if let Some(reason) = &deprecation_reason {
+                self.output.push_str(&format!("   * @deprecated {}\n", reason));
+            } else {
+                self.output.push_str("   * @deprecated\n");
+            }
+            self.output.push_str("   */\n");
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         self.output.push_str(&format!(
@@ -454,8 +882,35 @@ impl<'a> TypeScriptGenerator<'a> {
         let ts_type = self.convert_type(&field.ty, self.interner);
         let optional = self.is_optional(&field.ty) || field.default_value.is_some();
 
+<<<<<<< HEAD
         if let Some(desc) = &field.description {
             self.output.push_str(&format!("  /** {} */\n", desc.value));
+=======
+        // Check for @deprecated directive
+        let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&field.directives);
+
+        if let Some(desc) = &field.description {
+            if is_deprecated {
+                self.output.push_str("  /**\n");
+                self.output.push_str(&format!("   * {}\n", desc.value));
+                if let Some(reason) = &deprecation_reason {
+                    self.output.push_str(&format!("   * @deprecated {}\n", reason));
+                } else {
+                    self.output.push_str("   * @deprecated\n");
+                }
+                self.output.push_str("   */\n");
+            } else {
+                self.output.push_str(&format!("  /** {} */\n", desc.value));
+            }
+        } else if is_deprecated {
+            self.output.push_str("  /**\n");
+            if let Some(reason) = &deprecation_reason {
+                self.output.push_str(&format!("   * @deprecated {}\n", reason));
+            } else {
+                self.output.push_str("   * @deprecated\n");
+            }
+            self.output.push_str("   */\n");
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         self.output.push_str(&format!(
@@ -466,6 +921,444 @@ impl<'a> TypeScriptGenerator<'a> {
         ));
     }
 
+<<<<<<< HEAD
+=======
+    fn write_operations(&mut self) {
+        let operations = extract_operations(self.document);
+        if operations.is_empty() {
+            return;
+        }
+
+        self.output.push_str(
+            "// =============================================================================\n",
+        );
+        self.output.push_str("// Operation Types and Typed Documents\n");
+        self.output.push_str(
+            "// =============================================================================\n\n",
+        );
+
+        for operation in operations {
+            self.write_operation(operation);
+        }
+    }
+
+    fn write_operation(&mut self, operation: &OperationDefinition<'_>) {
+        let op_name = match &operation.name {
+            Some(name) => self.interner.get(name.value).to_string(),
+            None => return, // Skip anonymous operations
+        };
+
+        let op_type_suffix = match operation.operation {
+            OperationType::Query => "Query",
+            OperationType::Mutation => "Mutation",
+            OperationType::Subscription => "Subscription",
+        };
+
+        let data_type_name = format!("{}{}", op_name, op_type_suffix);
+        let variables_type_name = format!("{}{}Variables", op_name, op_type_suffix);
+        let document_name = format!("{}Document", op_name);
+
+        // Generate Variables type
+        self.write_operation_variables_type(&variables_type_name, &operation.variables);
+
+        // Generate Data type (from selection set)
+        self.write_operation_data_type(&data_type_name, operation);
+
+        // Generate the TypedDocumentNode constant
+        self.write_typed_document_const(&document_name, &data_type_name, &variables_type_name, operation);
+    }
+
+    fn write_operation_variables_type(
+        &mut self,
+        type_name: &str,
+        variables: &[bgql_syntax::VariableDefinition<'_>],
+    ) {
+        if variables.is_empty() {
+            self.output.push_str(&format!(
+                "/** Variables for {} - no variables required */\n",
+                type_name
+            ));
+            self.output
+                .push_str(&format!("export type {} = Record<string, never>;\n\n", type_name));
+            return;
+        }
+
+        self.output.push_str("/** Variables type for operation */\n");
+        self.output.push_str(&format!("export interface {} {{\n", type_name));
+
+        for var in variables {
+            let var_name = self.interner.get(var.name.value);
+            let ts_type = self.convert_type(&var.ty, self.interner);
+            let is_optional = self.is_optional(&var.ty) || var.default_value.is_some();
+
+            self.output.push_str(&format!(
+                "  readonly {}{}: {};\n",
+                var_name,
+                if is_optional { "?" } else { "" },
+                ts_type
+            ));
+        }
+
+        self.output.push_str("}\n\n");
+    }
+
+    fn write_operation_data_type(
+        &mut self,
+        type_name: &str,
+        operation: &OperationDefinition<'_>,
+    ) {
+        self.output.push_str("/** Result data type for operation */\n");
+        self.output.push_str(&format!("export interface {} {{\n", type_name));
+
+        // Generate fields from selection set
+        for selection in &operation.selection_set.selections {
+            self.write_selection_field(selection, 1);
+        }
+
+        self.output.push_str("}\n\n");
+    }
+
+    fn write_selection_field(&mut self, selection: &Selection<'_>, indent: usize) {
+        let indent_str = "  ".repeat(indent);
+
+        match selection {
+            Selection::Field(field) => {
+                let field_name = match &field.alias {
+                    Some(alias) => self.interner.get(alias.value),
+                    None => self.interner.get(field.name.value),
+                };
+
+                // For now, generate as unknown type - in a real implementation,
+                // you would resolve this against the schema
+                if let Some(ref selection_set) = field.selection_set {
+                    self.output.push_str(&format!(
+                        "{}readonly {}: {{\n",
+                        indent_str, field_name
+                    ));
+                    for sub_selection in &selection_set.selections {
+                        self.write_selection_field(sub_selection, indent + 1);
+                    }
+                    self.output
+                        .push_str(&format!("{}}};\n", indent_str));
+                } else {
+                    // Scalar field - type would be resolved from schema in full implementation
+                    self.output.push_str(&format!(
+                        "{}readonly {}: unknown;\n",
+                        indent_str, field_name
+                    ));
+                }
+            }
+            Selection::FragmentSpread(spread) => {
+                let fragment_name = self.interner.get(spread.name.value);
+                self.output.push_str(&format!(
+                    "{}// Fragment spread: {}\n",
+                    indent_str, fragment_name
+                ));
+            }
+            Selection::InlineFragment(inline) => {
+                if let Some(type_condition) = &inline.type_condition {
+                    let type_name = self.interner.get(type_condition.value);
+                    self.output.push_str(&format!(
+                        "{}// Inline fragment on {}\n",
+                        indent_str, type_name
+                    ));
+                }
+                for sub_selection in &inline.selection_set.selections {
+                    self.write_selection_field(sub_selection, indent);
+                }
+            }
+        }
+    }
+
+    fn write_typed_document_const(
+        &mut self,
+        document_name: &str,
+        data_type: &str,
+        variables_type: &str,
+        operation: &OperationDefinition<'_>,
+    ) {
+        let op_type_str = match operation.operation {
+            OperationType::Query => "query",
+            OperationType::Mutation => "mutation",
+            OperationType::Subscription => "subscription",
+        };
+
+        let op_name = match &operation.name {
+            Some(name) => self.interner.get(name.value),
+            None => "Anonymous".to_string(),
+        };
+
+        self.output.push_str(&format!(
+            "/** Typed document node for {} {} */\n",
+            op_type_str, op_name
+        ));
+        self.output.push_str(&format!(
+            "export const {}: TypedDocumentNode<{}, {}> = {{\n",
+            document_name, data_type, variables_type
+        ));
+        self.output.push_str("  kind: 'Document',\n");
+        self.output.push_str("  definitions: [\n");
+        self.output.push_str("    {\n");
+        self.output.push_str("      kind: 'OperationDefinition',\n");
+        self.output
+            .push_str(&format!("      operation: '{}',\n", op_type_str));
+        self.output.push_str(&format!(
+            "      name: {{ kind: 'Name', value: '{}' }},\n",
+            op_name
+        ));
+
+        // Write variable definitions
+        if !operation.variables.is_empty() {
+            self.output.push_str("      variableDefinitions: [\n");
+            for var in &operation.variables {
+                self.write_variable_definition_node(var);
+            }
+            self.output.push_str("      ],\n");
+        }
+
+        // Write selection set
+        self.output.push_str("      selectionSet: ");
+        self.write_selection_set_node(&operation.selection_set, 4);
+        self.output.push_str(",\n");
+
+        self.output.push_str("    },\n");
+        self.output.push_str("  ],\n");
+        self.output.push_str("} as const;\n\n");
+    }
+
+    fn write_variable_definition_node(&mut self, var: &bgql_syntax::VariableDefinition<'_>) {
+        let var_name = self.interner.get(var.name.value);
+        self.output.push_str("        {\n");
+        self.output.push_str("          kind: 'VariableDefinition',\n");
+        self.output.push_str(&format!(
+            "          variable: {{ kind: 'Variable', name: {{ kind: 'Name', value: '{}' }} }},\n",
+            var_name
+        ));
+        self.output.push_str("          type: ");
+        self.write_type_node(&var.ty);
+        self.output.push_str(",\n");
+        self.output.push_str("        },\n");
+    }
+
+    fn write_type_node(&mut self, ty: &Type<'_>) {
+        match ty {
+            Type::Named(named) => {
+                let name = self.interner.get(named.name);
+                self.output.push_str(&format!(
+                    "{{ kind: 'NonNullType', type: {{ kind: 'NamedType', name: {{ kind: 'Name', value: '{}' }} }} }}",
+                    name
+                ));
+            }
+            Type::Option(inner, _) => {
+                // Optional type (nullable)
+                match inner.as_ref() {
+                    Type::Named(named) => {
+                        let name = self.interner.get(named.name);
+                        self.output.push_str(&format!(
+                            "{{ kind: 'NamedType', name: {{ kind: 'Name', value: '{}' }} }}",
+                            name
+                        ));
+                    }
+                    Type::List(inner_list, _) => {
+                        self.output.push_str("{ kind: 'ListType', type: ");
+                        self.write_type_node(inner_list);
+                        self.output.push_str(" }");
+                    }
+                    _ => {
+                        self.output.push_str("{ kind: 'NamedType', name: { kind: 'Name', value: 'Unknown' } }");
+                    }
+                }
+            }
+            Type::List(inner, _) => {
+                self.output.push_str("{ kind: 'NonNullType', type: { kind: 'ListType', type: ");
+                self.write_type_node(inner);
+                self.output.push_str(" } }");
+            }
+            Type::Generic(gen) => {
+                let name = self.interner.get(gen.name);
+                self.output.push_str(&format!(
+                    "{{ kind: 'NonNullType', type: {{ kind: 'NamedType', name: {{ kind: 'Name', value: '{}' }} }} }}",
+                    name
+                ));
+            }
+            Type::Tuple(_) => {
+                self.output.push_str("{ kind: 'NamedType', name: { kind: 'Name', value: 'Tuple' } }");
+            }
+            Type::_Phantom(_) => {
+                self.output.push_str("{ kind: 'NamedType', name: { kind: 'Name', value: 'Unknown' } }");
+            }
+        }
+    }
+
+    fn write_selection_set_node(&mut self, selection_set: &bgql_syntax::SelectionSet<'_>, indent: usize) {
+        let indent_str = "  ".repeat(indent);
+        self.output.push_str("{\n");
+        self.output.push_str(&format!("{}  kind: 'SelectionSet',\n", indent_str));
+        self.output.push_str(&format!("{}  selections: [\n", indent_str));
+
+        for selection in &selection_set.selections {
+            self.write_selection_node(selection, indent + 2);
+        }
+
+        self.output.push_str(&format!("{}  ],\n", indent_str));
+        self.output.push_str(&format!("{}}}", indent_str));
+    }
+
+    fn write_selection_node(&mut self, selection: &Selection<'_>, indent: usize) {
+        let indent_str = "  ".repeat(indent);
+
+        match selection {
+            Selection::Field(field) => {
+                let field_name = self.interner.get(field.name.value);
+                self.output.push_str(&format!("{}    {{\n", indent_str));
+                self.output.push_str(&format!("{}      kind: 'Field',\n", indent_str));
+
+                if let Some(alias) = &field.alias {
+                    let alias_name = self.interner.get(alias.value);
+                    self.output.push_str(&format!(
+                        "{}      alias: {{ kind: 'Name', value: '{}' }},\n",
+                        indent_str, alias_name
+                    ));
+                }
+
+                self.output.push_str(&format!(
+                    "{}      name: {{ kind: 'Name', value: '{}' }},\n",
+                    indent_str, field_name
+                ));
+
+                // Write arguments if present
+                if !field.arguments.is_empty() {
+                    self.output.push_str(&format!("{}      arguments: [\n", indent_str));
+                    for arg in &field.arguments {
+                        self.write_argument_node(arg, indent + 4);
+                    }
+                    self.output.push_str(&format!("{}      ],\n", indent_str));
+                }
+
+                // Write nested selection set if present
+                if let Some(ref sub_selection) = field.selection_set {
+                    self.output.push_str(&format!("{}      selectionSet: ", indent_str));
+                    self.write_selection_set_node(sub_selection, indent + 3);
+                    self.output.push_str(",\n");
+                }
+
+                self.output.push_str(&format!("{}    }},\n", indent_str));
+            }
+            Selection::FragmentSpread(spread) => {
+                let fragment_name = self.interner.get(spread.name.value);
+                self.output.push_str(&format!("{}    {{\n", indent_str));
+                self.output.push_str(&format!("{}      kind: 'FragmentSpread',\n", indent_str));
+                self.output.push_str(&format!(
+                    "{}      name: {{ kind: 'Name', value: '{}' }},\n",
+                    indent_str, fragment_name
+                ));
+                self.output.push_str(&format!("{}    }},\n", indent_str));
+            }
+            Selection::InlineFragment(inline) => {
+                self.output.push_str(&format!("{}    {{\n", indent_str));
+                self.output.push_str(&format!("{}      kind: 'InlineFragment',\n", indent_str));
+
+                if let Some(type_condition) = &inline.type_condition {
+                    let type_name = self.interner.get(type_condition.value);
+                    self.output.push_str(&format!(
+                        "{}      typeCondition: {{ kind: 'NamedType', name: {{ kind: 'Name', value: '{}' }} }},\n",
+                        indent_str, type_name
+                    ));
+                }
+
+                self.output.push_str(&format!("{}      selectionSet: ", indent_str));
+                self.write_selection_set_node(&inline.selection_set, indent + 3);
+                self.output.push_str(",\n");
+
+                self.output.push_str(&format!("{}    }},\n", indent_str));
+            }
+        }
+    }
+
+    fn write_argument_node(&mut self, arg: &bgql_syntax::Argument<'_>, indent: usize) {
+        let indent_str = "  ".repeat(indent);
+        let arg_name = self.interner.get(arg.name.value);
+
+        self.output.push_str(&format!("{}  {{\n", indent_str));
+        self.output.push_str(&format!("{}    kind: 'Argument',\n", indent_str));
+        self.output.push_str(&format!(
+            "{}    name: {{ kind: 'Name', value: '{}' }},\n",
+            indent_str, arg_name
+        ));
+        self.output.push_str(&format!("{}    value: ", indent_str));
+        self.write_value_node(&arg.value);
+        self.output.push_str(",\n");
+        self.output.push_str(&format!("{}  }},\n", indent_str));
+    }
+
+    fn write_value_node(&mut self, value: &bgql_syntax::Value<'_>) {
+        match value {
+            bgql_syntax::Value::Variable(name) => {
+                let var_name = self.interner.get(name.value);
+                self.output.push_str(&format!(
+                    "{{ kind: 'Variable', name: {{ kind: 'Name', value: '{}' }} }}",
+                    var_name
+                ));
+            }
+            bgql_syntax::Value::Int(i, _) => {
+                self.output
+                    .push_str(&format!("{{ kind: 'IntValue', value: '{}' }}", i));
+            }
+            bgql_syntax::Value::Float(f, _) => {
+                self.output
+                    .push_str(&format!("{{ kind: 'FloatValue', value: '{}' }}", f));
+            }
+            bgql_syntax::Value::String(s, _) => {
+                // Escape quotes in the string
+                let escaped = s.replace('\\', "\\\\").replace('\'', "\\'");
+                self.output
+                    .push_str(&format!("{{ kind: 'StringValue', value: '{}' }}", escaped));
+            }
+            bgql_syntax::Value::Boolean(b, _) => {
+                self.output
+                    .push_str(&format!("{{ kind: 'BooleanValue', value: {} }}", b));
+            }
+            bgql_syntax::Value::Null(_) => {
+                self.output.push_str("{ kind: 'NullValue' }");
+            }
+            bgql_syntax::Value::Enum(name) => {
+                let enum_value = self.interner.get(name.value);
+                self.output
+                    .push_str(&format!("{{ kind: 'EnumValue', value: '{}' }}", enum_value));
+            }
+            bgql_syntax::Value::List(values, _) => {
+                self.output.push_str("{ kind: 'ListValue', values: [");
+                for (i, v) in values.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    self.write_value_node(v);
+                }
+                self.output.push_str("] }");
+            }
+            bgql_syntax::Value::Object(fields, _) => {
+                self.output.push_str("{ kind: 'ObjectValue', fields: [");
+                for (i, (name, v)) in fields.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    let field_name = self.interner.get(name.value);
+                    self.output.push_str(&format!(
+                        "{{ kind: 'ObjectField', name: {{ kind: 'Name', value: '{}' }}, value: ",
+                        field_name
+                    ));
+                    self.write_value_node(v);
+                    self.output.push_str(" }");
+                }
+                self.output.push_str("] }");
+            }
+            bgql_syntax::Value::_Phantom(_) => {
+                self.output.push_str("{ kind: 'NullValue' }");
+            }
+        }
+    }
+
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     fn write_client_sdk(&mut self) {
         self.output.push_str(
             "// =============================================================================\n",
@@ -692,13 +1585,68 @@ impl<'a> TypeScriptGenerator<'a> {
     }
 
     fn write_jsdoc(&mut self, doc: &str) {
+<<<<<<< HEAD
+=======
+        self.write_jsdoc_with_deprecated(doc, false, None);
+    }
+
+    fn write_jsdoc_with_deprecated(
+        &mut self,
+        doc: &str,
+        is_deprecated: bool,
+        deprecation_reason: Option<&str>,
+    ) {
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         self.output.push_str("/**\n");
         for line in doc.lines() {
             self.output.push_str(&format!(" * {}\n", line));
         }
+<<<<<<< HEAD
         self.output.push_str(" */\n");
     }
 
+=======
+        if is_deprecated {
+            if let Some(reason) = deprecation_reason {
+                self.output.push_str(&format!(" * @deprecated {}\n", reason));
+            } else {
+                self.output.push_str(" * @deprecated\n");
+            }
+        }
+        self.output.push_str(" */\n");
+    }
+
+    fn write_deprecated_jsdoc(&mut self, deprecation_reason: Option<&str>) {
+        self.output.push_str("/**\n");
+        if let Some(reason) = deprecation_reason {
+            self.output.push_str(&format!(" * @deprecated {}\n", reason));
+        } else {
+            self.output.push_str(" * @deprecated\n");
+        }
+        self.output.push_str(" */\n");
+    }
+
+    /// Check if directives contain @deprecated and extract the reason if present.
+    fn get_deprecation_info(&self, directives: &[Directive<'_>]) -> (bool, Option<String>) {
+        for directive in directives {
+            let name = self.interner.get(directive.name.value);
+            if name == "deprecated" {
+                // Look for 'reason' argument
+                for arg in &directive.arguments {
+                    let arg_name = self.interner.get(arg.name.value);
+                    if arg_name == "reason" {
+                        if let bgql_syntax::Value::String(reason, _) = &arg.value {
+                            return (true, Some(reason.clone()));
+                        }
+                    }
+                }
+                return (true, None);
+            }
+        }
+        (false, None)
+    }
+
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     fn is_optional(&self, ty: &Type<'_>) -> bool {
         matches!(ty, Type::Option(_, _))
     }
@@ -749,10 +1697,17 @@ impl<'a> TypeConverter for TypeScriptGenerator<'a> {
 
     fn convert_scalar(&self, name: &str) -> String {
         match name {
+<<<<<<< HEAD
             "Int" | "Float" => "number".to_string(),
             "String" | "ID" => "string".to_string(),
             "Boolean" => "boolean".to_string(),
             "DateTime" => "string".to_string(),
+=======
+            "Int" | "Float" | "Uint" => "number".to_string(),
+            "String" | "ID" | "DateTime" | "Date" => "string".to_string(),
+            "Boolean" => "boolean".to_string(),
+            "Void" => "void".to_string(),
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
             "JSON" => "Record<string, unknown>".to_string(),
             other => other.to_string(),
         }
@@ -766,3 +1721,257 @@ fn capitalize(s: &str) -> String {
         Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
     }
 }
+<<<<<<< HEAD
+=======
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper struct for testing scalar conversion
+    struct TestConverter;
+
+    impl TypeConverter for TestConverter {
+        fn convert_type(&self, _ty: &Type<'_>, _interner: &Interner) -> String {
+            String::new()
+        }
+
+        fn convert_scalar(&self, name: &str) -> String {
+            match name {
+                "Int" | "Float" | "Uint" => "number".to_string(),
+                "String" | "ID" | "DateTime" | "Date" => "string".to_string(),
+                "Boolean" => "boolean".to_string(),
+                "Void" => "void".to_string(),
+                "JSON" => "Record<string, unknown>".to_string(),
+                other => other.to_string(),
+            }
+        }
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_int() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("Int"), "number");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_float() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("Float"), "number");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_uint() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("Uint"), "number");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_string() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("String"), "string");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_id() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("ID"), "string");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_datetime() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("DateTime"), "string");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_date() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("Date"), "string");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_boolean() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("Boolean"), "boolean");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_void() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("Void"), "void");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_json() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("JSON"), "Record<string, unknown>");
+    }
+
+    #[test]
+    fn test_scalar_to_typescript_custom() {
+        let converter = TestConverter;
+        assert_eq!(converter.convert_scalar("CustomType"), "CustomType");
+    }
+
+    #[test]
+    fn test_utility_types_generated() {
+        // Test that utility types section header is generated
+        let mut output = String::new();
+        output.push_str(
+            "// =============================================================================\n",
+        );
+        output.push_str("// Utility Types\n");
+        output.push_str(
+            "// =============================================================================\n\n",
+        );
+        output.push_str("/** Makes all properties in T optional */\n");
+        output.push_str("export type BgqlPartial<T> = Partial<T>;\n\n");
+
+        assert!(output.contains("BgqlPartial<T>"));
+        assert!(output.contains("Utility Types"));
+    }
+
+    #[test]
+    fn test_assert_never_helper_generated() {
+        let expected = "export function assertNever(value: never): never {\n  throw new Error(`Unexpected value: ${JSON.stringify(value)}`);\n}\n";
+        assert!(expected.contains("assertNever"));
+        assert!(expected.contains("never"));
+    }
+
+    #[test]
+    fn test_deprecated_jsdoc_format() {
+        let mut output = String::new();
+        output.push_str("/**\n");
+        output.push_str(" * @deprecated Use newField instead\n");
+        output.push_str(" */\n");
+
+        assert!(output.contains("@deprecated"));
+        assert!(output.contains("Use newField instead"));
+    }
+
+    #[test]
+    fn test_deprecated_jsdoc_without_reason() {
+        let mut output = String::new();
+        output.push_str("/**\n");
+        output.push_str(" * @deprecated\n");
+        output.push_str(" */\n");
+
+        assert!(output.contains("@deprecated"));
+    }
+
+    #[test]
+    fn test_type_guard_format() {
+        // Test that union type guards have correct format
+        let type_guard = "isUser: (value: SearchResult): value is User => value.__typename === 'User',";
+
+        assert!(type_guard.contains("value is User"));
+        assert!(type_guard.contains("__typename === 'User'"));
+    }
+
+    #[test]
+    fn test_capitalize() {
+        assert_eq!(capitalize("hello"), "Hello");
+        assert_eq!(capitalize("world"), "World");
+        assert_eq!(capitalize(""), "");
+        assert_eq!(capitalize("a"), "A");
+        assert_eq!(capitalize("ABC"), "ABC");
+    }
+
+    #[test]
+    fn test_typed_document_node_interface() {
+        // Test that TypedDocumentNode interface is properly structured
+        let expected = "export interface TypedDocumentNode<TData = unknown, TVariables = Record<string, unknown>> extends DocumentNode";
+        assert!(expected.contains("TypedDocumentNode"));
+        assert!(expected.contains("TData"));
+        assert!(expected.contains("TVariables"));
+    }
+
+    #[test]
+    fn test_result_of_helper_type() {
+        let expected = "export type ResultOf<T> = T extends TypedDocumentNode<infer Data, any> ? Data : never;";
+        assert!(expected.contains("ResultOf"));
+        assert!(expected.contains("infer Data"));
+    }
+
+    #[test]
+    fn test_variables_of_helper_type() {
+        let expected = "export type VariablesOf<T> = T extends TypedDocumentNode<any, infer Vars> ? Vars : never;";
+        assert!(expected.contains("VariablesOf"));
+        assert!(expected.contains("infer Vars"));
+    }
+
+    #[test]
+    fn test_exact_type_helper() {
+        let expected = "export type Exact<T, Shape> = T extends Shape ? (Exclude<keyof T, keyof Shape> extends never ? T : never) : never;";
+        assert!(expected.contains("Exact<T, Shape>"));
+        assert!(expected.contains("Exclude<keyof T, keyof Shape>"));
+    }
+
+    #[test]
+    fn test_deep_readonly_type() {
+        let expected = "export type DeepReadonly<T> = T extends (infer U)[] ? ReadonlyArray<DeepReadonly<U>> : T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T;";
+        assert!(expected.contains("DeepReadonly"));
+        assert!(expected.contains("ReadonlyArray"));
+    }
+
+    #[test]
+    fn test_maybe_type() {
+        let expected = "export type Maybe<T> = T | null;";
+        assert!(expected.contains("Maybe<T>"));
+        assert!(expected.contains("| null"));
+    }
+
+    #[test]
+    fn test_input_maybe_type() {
+        let expected = "export type InputMaybe<T> = T | null | undefined;";
+        assert!(expected.contains("InputMaybe<T>"));
+        assert!(expected.contains("| undefined"));
+    }
+
+    #[test]
+    fn test_enum_values_const() {
+        // Test that enum values are generated with `as const`
+        let expected = "} as const;";
+        assert!(expected.contains("as const"));
+    }
+
+    #[test]
+    fn test_readonly_array_type() {
+        // Test that lists are converted to ReadonlyArray
+        // The actual implementation uses ReadonlyArray<T>
+        let expected = "ReadonlyArray<number>";
+        assert!(expected.contains("ReadonlyArray"));
+    }
+
+    #[test]
+    fn test_document_node_structure() {
+        // Test DocumentNode interface structure
+        let expected = "export interface DocumentNode {\n  readonly kind: 'Document';\n  readonly definitions: ReadonlyArray<DefinitionNode>;\n}";
+        assert!(expected.contains("DocumentNode"));
+        assert!(expected.contains("readonly kind"));
+        assert!(expected.contains("ReadonlyArray<DefinitionNode>"));
+    }
+
+    #[test]
+    fn test_fragment_type_helper() {
+        let expected = "export type FragmentType<T> = { readonly ' $fragmentRefs'?: T };";
+        assert!(expected.contains("FragmentType"));
+        assert!(expected.contains("$fragmentRefs"));
+    }
+
+    #[test]
+    fn test_unmasked_type_helper() {
+        let expected = "export type Unmasked<T> = T extends FragmentType<infer U> ? U : T;";
+        assert!(expected.contains("Unmasked"));
+        assert!(expected.contains("FragmentType"));
+    }
+
+    #[test]
+    fn test_typed_document_string() {
+        let expected = "export type TypedDocumentString<TData, TVariables> = string & TypedDocumentNode<TData, TVariables>;";
+        assert!(expected.contains("TypedDocumentString"));
+        assert!(expected.contains("string &"));
+    }
+}
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9

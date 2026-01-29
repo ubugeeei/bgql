@@ -7,8 +7,17 @@
 import {
   ref,
   watch,
+<<<<<<< HEAD
   onUnmounted,
   type Ref,
+=======
+  inject,
+  computed,
+  onUnmounted,
+  toValue,
+  type Ref,
+  type MaybeRefOrGetter,
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 } from 'vue';
 import type {
   DocumentNode,
@@ -19,6 +28,20 @@ import type {
   UseQueryResult,
   MultipartChunk,
 } from './types';
+<<<<<<< HEAD
+=======
+import type { BgqlClient } from '../client';
+
+/**
+ * Injection key for the BGQL client instance.
+ */
+export const BGQL_CLIENT_KEY = Symbol('bgql-client');
+
+/**
+ * Injection key for SSR context.
+ */
+export const BGQL_SSR_CONTEXT_KEY = Symbol('bgql-ssr-context');
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
 /**
  * Default stream state.
@@ -31,14 +54,56 @@ const DEFAULT_STREAM_STATE: StreamState = {
 };
 
 /**
+<<<<<<< HEAD
  * Executes a GraphQL query with full streaming support.
  *
+=======
+ * Extended query options with reactive variable support.
+ */
+export interface UseQueryOptions<TVariables = Record<string, unknown>> extends Omit<QueryOptions<TVariables>, 'variables' | 'skip'> {
+  /**
+   * Reactive variables - can be a ref, getter, or plain object.
+   */
+  readonly variables?: MaybeRefOrGetter<TVariables | undefined>;
+
+  /**
+   * Reactive skip option - can be a ref, getter, or plain boolean.
+   */
+  readonly skip?: MaybeRefOrGetter<boolean>;
+
+  /**
+   * Reactive pause option (alias for skip).
+   */
+  readonly pause?: MaybeRefOrGetter<boolean>;
+
+  /**
+   * Custom client instance. If not provided, uses injected client.
+   */
+  readonly client?: BgqlClient;
+}
+
+/**
+ * Executes a GraphQL query with full streaming support.
+ *
+ * Uses provide/inject for client instance. Make sure to wrap your app
+ * with BgqlProvider or provide a client via the `client` option.
+ *
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
  * @example
  * ```vue
  * <script setup>
  * import { useQuery } from '@bgql/client/vue'
+<<<<<<< HEAD
  *
  * const { data, loading, error, streamState, pause, resume } = useQuery(
+=======
+ * import { ref, computed } from 'vue'
+ *
+ * const userId = ref('1')
+ *
+ * // With reactive variables
+ * const { data, loading, error, refetch } = useQuery(
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
  *   gql`
  *     query GetUser($id: ID!) {
  *       user(id: $id) {
@@ -51,17 +116,53 @@ const DEFAULT_STREAM_STATE: StreamState = {
  *       }
  *     }
  *   `,
+<<<<<<< HEAD
  *   { variables: { id: '1' }, streaming: true }
  * )
+=======
+ *   {
+ *     variables: () => ({ id: userId.value }),
+ *     streaming: true,
+ *     pollInterval: 30000, // Poll every 30 seconds
+ *   }
+ * )
+ *
+ * // Skip query based on condition
+ * const { data: conditionalData } = useQuery(query, {
+ *   variables: { id: userId.value },
+ *   skip: () => !userId.value, // Skip when no userId
+ * })
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
  * </script>
  * ```
  */
 export function useQuery<TData = unknown, TVariables = Record<string, unknown>>(
   query: DocumentNode | string,
+<<<<<<< HEAD
   options: QueryOptions<TVariables> = {}
 ): UseQueryResult<TData> {
   const data = ref<TData | null>(null) as Ref<TData | null>;
   const loading = ref(!options.skip);
+=======
+  options: UseQueryOptions<TVariables> = {}
+): UseQueryResult<TData> {
+  // Get the injected client, or use provided client
+  const injectedClient = inject<BgqlClient | null>(BGQL_CLIENT_KEY, null);
+  const client = options.client ?? injectedClient;
+  // Computed reactive values for skip/pause and variables
+  const isSkipped = computed(() => {
+    const skip = toValue(options.skip);
+    const pause = toValue(options.pause);
+    return skip === true || pause === true;
+  });
+
+  const currentVariables = computed(() => {
+    return toValue(options.variables);
+  });
+
+  const data = ref<TData | null>(null) as Ref<TData | null>;
+  const loading = ref(!isSkipped.value);
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
   const error = ref<Error | null>(null);
   const streamState = ref<StreamState>({ ...DEFAULT_STREAM_STATE });
   const controller = ref<ExecutionController | null>(null);
@@ -72,7 +173,11 @@ export function useQuery<TData = unknown, TVariables = Record<string, unknown>>(
   const executeQuery = async (
     variables?: TVariables
   ): Promise<void> => {
+<<<<<<< HEAD
     if (options.skip) {
+=======
+    if (isSkipped.value) {
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
       loading.value = false;
       return;
     }
@@ -86,7 +191,11 @@ export function useQuery<TData = unknown, TVariables = Record<string, unknown>>(
     streamState.value = { ...DEFAULT_STREAM_STATE };
 
     const queryString = typeof query === 'string' ? query : getQueryString(query);
+<<<<<<< HEAD
     const vars = variables ?? options.variables;
+=======
+    const vars = variables ?? currentVariables.value;
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
     try {
       if (options.streaming) {
@@ -257,13 +366,18 @@ export function useQuery<TData = unknown, TVariables = Record<string, unknown>>(
     if (token && controller.value) {
       await controller.value.resume(token);
     } else {
+<<<<<<< HEAD
       await executeQuery(options.variables);
+=======
+      await executeQuery(currentVariables.value);
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     }
   };
 
   const refetch = async (
     variables?: Record<string, unknown>
   ): Promise<void> => {
+<<<<<<< HEAD
     await executeQuery((variables ?? options.variables) as TVariables);
   };
 
@@ -284,13 +398,54 @@ export function useQuery<TData = unknown, TVariables = Record<string, unknown>>(
       { deep: true }
     );
   }
+=======
+    await executeQuery((variables ?? currentVariables.value) as TVariables);
+  };
+
+  // Initial execution
+  if (!isSkipped.value) {
+    executeQuery(currentVariables.value);
+  }
+
+  // Watch for variable changes and re-fetch automatically
+  watch(
+    currentVariables,
+    (newVars, oldVars) => {
+      // Deep compare to avoid unnecessary refetches
+      if (JSON.stringify(newVars) !== JSON.stringify(oldVars) && !isSkipped.value) {
+        executeQuery(newVars);
+      }
+    },
+    { deep: true }
+  );
+
+  // Watch for skip/pause changes
+  watch(
+    isSkipped,
+    (skipped, wasSkipped) => {
+      if (!skipped && wasSkipped) {
+        // Resume execution when unpaused
+        executeQuery(currentVariables.value);
+      } else if (skipped && !wasSkipped) {
+        // Stop execution when paused
+        abortController?.abort();
+        loading.value = false;
+      }
+    }
+  );
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
   // Set up polling
   if (options.pollInterval && options.pollInterval > 0) {
     const poll = (): void => {
       pollTimeoutId = setTimeout(async () => {
+<<<<<<< HEAD
         if (!options.skip) {
           await executeQuery(options.variables);
+=======
+        if (!isSkipped.value) {
+          await executeQuery(currentVariables.value);
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
           poll();
         }
       }, options.pollInterval);

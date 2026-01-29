@@ -25,11 +25,19 @@
 import { BgqlDefer as DeferComponent, createTypedDefer, BGQL_QUERY_CONTEXT_KEY } from './BgqlDefer';
 import { BgqlStream as StreamComponent, createTypedStream } from './BgqlStream';
 import { BgqlBinaryStream as BinaryStreamComponent } from './BgqlBinaryStream';
+<<<<<<< HEAD
 import { BgqlProvider as ProviderComponent } from './BgqlProvider';
+=======
+import { BgqlProvider as ProviderComponent, createClientProvider, createSSRContext, type SSRContext } from './BgqlProvider';
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
 // Named exports for individual component imports
 export { createTypedDefer, BGQL_QUERY_CONTEXT_KEY } from './BgqlDefer';
 export { createTypedStream } from './BgqlStream';
+<<<<<<< HEAD
+=======
+export { createClientProvider, createSSRContext, type SSRContext } from './BgqlProvider';
+>>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
 // Legacy named exports (for backwards compatibility)
 export const BgqlDefer = DeferComponent;
