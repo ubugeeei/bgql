@@ -1,0 +1,91 @@
+# Mutation Types Module
+#
+# Demonstrates:
+# - Typed result unions (success | validation | auth errors)
+# - @requireAuth with role-based access
+# - @rateLimit for protection
+# - Input validation via directives
+
+use super::types::{UserId, PostId}
+use super::errors::{
+  CreateUserResult,
+  UpdateUserResult,
+  DeleteResult,
+  CreatePostResult,
+  UpdatePostResult,
+  AuthResult,
+}
+use super::inputs::{
+  CreateUserInput,
+  UpdateUserInput,
+  CreatePostInput,
+  UpdatePostInput,
+  LoginCredentials,
+}
+
+pub type Mutation {
+  # ============================================
+  # Auth Mutations
+  # ============================================
+
+  # Login with email/password or OAuth
+  # Returns typed union: AuthPayload | InvalidCredentialsError | ValidationError
+  login(credentials: LoginCredentials): AuthResult @rateLimit(requests: 5, window: 60)
+
+  # Logout current user
+  logout: Boolean @requireAuth
+
+  # Refresh authentication token
+  refreshToken: AuthResult @requireAuth
+
+  # ============================================
+  # User Mutations
+  # ============================================
+
+  # Create new user (public registration)
+  createUser(input: CreateUserInput): CreateUserResult @rateLimit(requests: 3, window: 60)
+
+  # Update current user's profile
+  updateMe(input: UpdateUserInput): UpdateUserResult @requireAuth
+
+  # Update any user (admin only)
+  updateUser(
+    id: UserId
+    input: UpdateUserInput
+  ): UpdateUserResult @requireAuth(roles: [Admin])
+
+  # Delete user (admin only)
+  deleteUser(id: UserId): DeleteResult @requireAuth(roles: [Admin])
+
+  # ============================================
+  # Post Mutations
+  # ============================================
+
+  # Create new post
+  createPost(input: CreatePostInput): CreatePostResult @requireAuth
+
+  # Update own post
+  updatePost(
+    id: PostId
+    input: UpdatePostInput
+  ): UpdatePostResult @requireAuth
+
+  # Publish draft post
+  publishPost(id: PostId): UpdatePostResult @requireAuth
+
+  # Delete post (owner or admin)
+  deletePost(id: PostId): DeleteResult @requireAuth
+
+  # ============================================
+  # Admin Mutations
+  # ============================================
+
+  # Bulk delete posts (admin only)
+  bulkDeletePosts(ids: List<PostId>): BulkDeleteResult @requireAuth(roles: [Admin])
+}
+
+# Bulk operation result
+pub type BulkDeleteResult {
+  deletedCount: Uint
+  failedIds: List<ID>
+}

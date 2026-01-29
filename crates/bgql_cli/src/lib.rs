@@ -32,7 +32,6 @@ use bgql_core::Interner;
 use bgql_syntax::{parse, FormatOptions};
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -66,6 +65,16 @@ pub enum CodegenLanguage {
     Typescript,
     Rust,
     Go,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum IdeTarget {
+    /// Zed editor
+    Zed,
+    /// Visual Studio Code
+    Vscode,
+    /// Neovim
+    Neovim,
 }
 
 #[derive(Subcommand, Debug)]
@@ -216,6 +225,25 @@ pub enum Commands {
 
     /// Print version information
     Version,
+
+    /// IDE/Editor integration
+    Ide {
+        /// Target IDE
+        #[arg(value_enum)]
+        target: IdeTarget,
+
+        /// Install the extension
+        #[arg(long)]
+        install: bool,
+
+        /// Uninstall the extension
+        #[arg(long)]
+        uninstall: bool,
+
+        /// Show extension info
+        #[arg(long)]
+        info: bool,
+    },
 }
 
 pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
@@ -270,6 +298,12 @@ pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             println!("bgql {}", env!("CARGO_PKG_VERSION"));
             Ok(0)
         }
+        Commands::Ide {
+            target,
+            install,
+            uninstall,
+            info,
+        } => handle_ide_command(target, install, uninstall, info, cli.verbose),
     }
 }
 
@@ -623,6 +657,145 @@ fn capitalize(s: &str) -> String {
         None => String::new(),
         Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
     }
+}
+
+fn handle_ide_command(
+    target: IdeTarget,
+    install: bool,
+    uninstall: bool,
+    info: bool,
+    verbose: bool,
+) -> Result<i32, Box<dyn std::error::Error>> {
+    match target {
+        IdeTarget::Zed => handle_zed_command(install, uninstall, info, verbose),
+        IdeTarget::Vscode => {
+            println!("{} VS Code extension not yet available", "Info:".blue());
+            println!("  Install from marketplace: code --install-extension bgql.bgql");
+            Ok(0)
+        }
+        IdeTarget::Neovim => {
+            println!("{} Neovim plugin not yet available", "Info:".blue());
+            println!("  Add to your config:");
+            println!("    require('lspconfig').bgql.setup{{}}");
+            Ok(0)
+        }
+    }
+}
+
+fn handle_zed_command(
+    install: bool,
+    uninstall: bool,
+    info: bool,
+    verbose: bool,
+) -> Result<i32, Box<dyn std::error::Error>> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let zed_extensions_dir = PathBuf::from(&home).join(".config/zed/extensions/installed");
+    let bgql_ext_dir = zed_extensions_dir.join("bgql");
+
+    if info || (!install && !uninstall) {
+        println!("{}", "Better GraphQL - Zed Extension".green().bold());
+        println!();
+        println!("  Extension ID: bgql");
+        println!("  Version:      {}", env!("CARGO_PKG_VERSION"));
+        println!("  Features:");
+        println!("    - Syntax highlighting for .bgql files");
+        println!("    - Language Server Protocol support");
+        println!("    - Auto-completion and diagnostics");
+        println!();
+
+        if bgql_ext_dir.exists() {
+            println!("  Status: {} (at {})", "Installed".green(), bgql_ext_dir.display());
+        } else {
+            println!("  Status: {}", "Not installed".yellow());
+            println!();
+            println!("  To install: bgql ide zed --install");
+        }
+        return Ok(0);
+    }
+
+    if uninstall {
+        if bgql_ext_dir.exists() {
+            std::fs::remove_dir_all(&bgql_ext_dir)?;
+            println!("{} Removed bgql extension from Zed", "Success:".green().bold());
+        } else {
+            println!("{} bgql extension is not installed", "Info:".blue());
+        }
+        return Ok(0);
+    }
+
+    if install {
+        // Get the extension source directory
+        let extension_src = get_extension_source_dir()?;
+
+        if verbose {
+            println!("{} Extension source: {}", "Info:".blue(), extension_src.display());
+        }
+
+        // Create extensions directory if it doesn't exist
+        std::fs::create_dir_all(&zed_extensions_dir)?;
+
+        // Copy extension files
+        copy_dir_recursive(&extension_src, &bgql_ext_dir)?;
+
+        println!("{} Installed bgql extension to Zed", "Success:".green().bold());
+        println!();
+        println!("  Location: {}", bgql_ext_dir.display());
+        println!();
+        println!("  {} Restart Zed to activate the extension", "Note:".yellow());
+
+        return Ok(0);
+    }
+
+    Ok(0)
+}
+
+fn get_extension_source_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    // Try to find the extension in common locations
+    let candidates = [
+        // Development: relative to binary
+        std::env::current_exe()?
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join("../../editors/zed"),
+        // Development: current directory
+        PathBuf::from("editors/zed"),
+        // Installed: alongside binary
+        std::env::current_exe()?
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join("share/bgql/editors/zed"),
+        // System install
+        PathBuf::from("/usr/local/share/bgql/editors/zed"),
+    ];
+
+    for candidate in candidates {
+        if candidate.exists() && candidate.join("extension.toml").exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err("Could not find bgql Zed extension source. Make sure you're running from the bgql repository or have bgql properly installed.".into())
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if !dst.exists() {
+        std::fs::create_dir_all(dst)?;
+    }
+
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if ty.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
+    Ok(())
 }
 
 fn parse_file(file: &Path, fmt: &str) -> Result<i32, Box<dyn std::error::Error>> {

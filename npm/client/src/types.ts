@@ -653,94 +653,26 @@ export function matchUnionPartial<
 }
 
 // =============================================================================
-// Result Type Pattern - Type-Safe Error Handling
+// Result Type Aliases - Re-export from result.ts for convenience
 // =============================================================================
 
-/**
- * Success result wrapper.
- */
-export interface Success<T> {
-  readonly ok: true;
-  readonly value: T;
-  readonly error?: undefined;
-}
+// Note: Core Result types and functions are exported from './result'
+// These are type aliases for compatibility with the Success/Failure naming convention
+
+import type { Ok, Err, Result as CoreResult } from './result';
 
 /**
- * Failure result wrapper.
+ * Success result wrapper (alias for Ok<T>).
  */
-export interface Failure<E> {
-  readonly ok: false;
-  readonly value?: undefined;
-  readonly error: E;
-}
+export type Success<T> = Ok<T>;
 
 /**
- * Result type for type-safe error handling.
+ * Failure result wrapper (alias for Err<E>).
  */
-export type Result<T, E = Error> = Success<T> | Failure<E>;
+export type Failure<E> = Err<E>;
 
-/**
- * Creates a success result.
- */
-export function ok<T>(value: T): Success<T> {
-  return { ok: true, value };
-}
-
-/**
- * Creates a failure result.
- */
-export function err<E>(error: E): Failure<E> {
-  return { ok: false, error };
-}
-
-/**
- * Checks if a result is a success.
- */
-export function isOk<T, E>(result: Result<T, E>): result is Success<T> {
-  return result.ok;
-}
-
-/**
- * Checks if a result is a failure.
- */
-export function isErr<T, E>(result: Result<T, E>): result is Failure<E> {
-  return !result.ok;
-}
-
-/**
- * Maps a successful result.
- */
-export function mapResult<T, U, E>(
-  result: Result<T, E>,
-  fn: (value: T) => U
-): Result<U, E> {
-  return result.ok ? ok(fn(result.value)) : result;
-}
-
-/**
- * Maps an error result.
- */
-export function mapError<T, E, F>(
-  result: Result<T, E>,
-  fn: (error: E) => F
-): Result<T, F> {
-  return result.ok ? result : err(fn(result.error));
-}
-
-/**
- * Unwraps a result, throwing on error.
- */
-export function unwrap<T, E>(result: Result<T, E>): T {
-  if (result.ok) return result.value;
-  throw result.error instanceof Error ? result.error : new Error(String(result.error));
-}
-
-/**
- * Unwraps a result with a default value on error.
- */
-export function unwrapOr<T, E>(result: Result<T, E>, defaultValue: T): T {
-  return result.ok ? result.value : defaultValue;
-}
+// Re-export Result from result.ts (don't redefine it)
+// Result, ok, err, isOk, isErr, unwrap, unwrapOr are exported from './result'
 
 // =============================================================================
 // Operation Types - Strict Query/Mutation Typing

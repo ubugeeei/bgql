@@ -1,0 +1,24 @@
+{
+  "name": "@bgql/example-ts-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "schema": "bgql build schema/mod.bgql -o dist/schema.graphql",
+    "codegen": "bgql codegen --lang typescript schema/mod.bgql -o src/generated/types.ts",
+    "dev": "bun run schema && bun --watch src/server.ts",
+    "build": "bun run schema && tsdown",
+    "start": "bun dist/server.js",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@bgql/server": "workspace:*",
+    "@bgql/client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@typescript/native-preview": "latest",
+    "tsdown": "latest",
+    "unplugin-macros": "latest"
+  }
+}

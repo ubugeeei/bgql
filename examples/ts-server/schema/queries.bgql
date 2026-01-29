@@ -1,0 +1,69 @@
+# Query Types Module
+#
+# Demonstrates:
+# - Typed result unions for error handling
+# - Generic Connection types for pagination
+# - @cache directive for performance
+# - @requireAuth for authorization
+
+use super::types::{User, Post, UserId, PostId, Connection}
+use super::errors::{UserResult, PostResult}
+use super::inputs::{UserFilter, PostFilter}
+
+pub type Query {
+  # ============================================
+  # User Queries
+  # ============================================
+
+  # Current authenticated user
+  me: Option<User> @requireAuth
+
+  # Get user by ID - returns typed union
+  user(id: UserId): UserResult
+
+  # List users with pagination and filtering
+  users(
+    first: Option<Int>
+    after: Option<String>
+    filter: Option<UserFilter>
+  ): Connection<User> @cache(maxAge: 60, scope: PUBLIC)
+
+  # ============================================
+  # Post Queries
+  # ============================================
+
+  # Get post by ID - returns typed union
+  post(id: PostId): PostResult
+
+  # List posts with pagination and filtering
+  posts(
+    first: Option<Int>
+    after: Option<String>
+    filter: Option<PostFilter>
+  ): Connection<Post> @cache(maxAge: 30, scope: PUBLIC)
+
+  # Get posts by author
+  postsByAuthor(
+    authorId: UserId
+    first: Option<Int>
+    after: Option<String>
+  ): Connection<Post>
+
+  # ============================================
+  # Search
+  # ============================================
+
+  # Global search across users and posts
+  search(
+    query: String @minLength(2) @maxLength(100)
+    first: Option<Int>
+  ): SearchResults
+}
+
+# Search results union
+pub union SearchResult = User | Post
+
+pub type SearchResults {
+  results: List<SearchResult>
+  totalCount: Uint
+}

@@ -1,0 +1,78 @@
+# =============================================================================
+# Generic Pagination Types
+# =============================================================================
+# Demonstrates: generics, type constraints, type aliases
+
+"""
+Relay-style cursor-based pagination.
+Generic over any type that implements Node.
+"""
+pub type Connection<T extends Node> {
+  """List of edges containing nodes"""
+  edges: List<Edge<T>>
+
+  """Pagination metadata"""
+  pageInfo: PageInfo
+
+  """Total count of items (may require separate query)"""
+  totalCount: Uint
+}
+
+"""
+Edge wrapper for cursor-based pagination.
+Contains cursor position and the actual node.
+"""
+pub type Edge<T> {
+  """Opaque cursor for this position"""
+  cursor: String
+
+  """The actual item"""
+  node: T
+}
+
+"""Pagination metadata"""
+pub type PageInfo {
+  """Are there more items after the last edge?"""
+  hasNextPage: Boolean
+
+  """Are there items before the first edge?"""
+  hasPreviousPage: Boolean
+
+  """Cursor of the first edge"""
+  startCursor: Option<String>
+
+  """Cursor of the last edge"""
+  endCursor: Option<String>
+}
+
+"""Node interface for identifiable entities"""
+pub interface Node {
+  id: ID
+}
+
+"""Timestamped entities"""
+pub interface Timestamped {
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+}
+
+"""Entities that can be soft-deleted"""
+pub interface SoftDeletable {
+  deletedAt: Option<DateTime>
+  isDeleted: Boolean
+}
+
+# =============================================================================
+# Sorting Types
+# =============================================================================
+
+pub enum SortDirection {
+  Asc
+  Desc
+}
+
+"""Generic sort field specification"""
+pub input SortField<Field extends String> {
+  field: Field
+  direction: SortDirection = Asc
+}

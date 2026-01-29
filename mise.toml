@@ -3,6 +3,12 @@ rust = "latest"
 bun = "latest"
 node = "22"
 
+[env]
+_.path = ["./target/release"]
+
+[hooks.enter]
+run = "cargo build --release -p bgql_cli"
+
 [tasks.check]
 description = "Run cargo check"
 run = "cargo check --workspace --all-features"
@@ -111,3 +117,28 @@ depends = ["playground:install", "npm:install", "vscode:install"]
 [tasks.all]
 description = "Run all checks and builds"
 depends = ["ci", "playground:typecheck", "npm:typecheck", "vscode:typecheck"]
+
+# CLI tasks
+[tasks."cli:build"]
+description = "Build bgql CLI"
+run = "cargo build --release -p bgql_cli"
+
+[tasks."cli:install"]
+description = "Install bgql CLI globally"
+depends = ["cli:build"]
+run = """
+mkdir -p ~/.local/bin
+cp target/release/bgql ~/.local/bin/bgql
+echo "Installed bgql to ~/.local/bin/bgql"
+echo "Make sure ~/.local/bin is in your PATH"
+"""
+
+[tasks."cli:install:global"]
+description = "Install bgql CLI globally (requires sudo)"
+depends = ["cli:build"]
+run = """
+sudo cp target/release/bgql /usr/local/bin/bgql
+sudo mkdir -p /usr/local/share/bgql
+sudo cp -r editors /usr/local/share/bgql/
+echo "Installed bgql to /usr/local/bin/bgql"
+"""

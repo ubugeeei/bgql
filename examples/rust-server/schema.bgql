@@ -1,0 +1,601 @@
+# Better GraphQL Schema - Enhanced Blog API Example
+# This schema demonstrates all BGQL-specific features
+
+# =============================================================================
+# Schema Configuration
+# =============================================================================
+
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+# =============================================================================
+# Opaque Types (Nominal Typing for Type Safety)
+# =============================================================================
+
+opaque UserId = ID
+opaque PostId = ID
+opaque CommentId = ID
+opaque SessionId = ID
+
+# =============================================================================
+# Enums
+# =============================================================================
+
+enum PostStatus {
+  Draft
+  Published
+  Archived
+}
+
+enum Role {
+  Admin
+  Editor
+  Author
+  Reader
+}
+
+enum CacheScope {
+  Public
+  Private
+  NoStore
+}
+
+enum NotificationType {
+  PostPublished
+  NewComment
+  NewFollower
+  Mention
+}
+
+# =============================================================================
+# Generic Types (BGQL Feature: Generics)
+# =============================================================================
+
+"""Generic connection type for cursor-based pagination"""
+type Connection<T> {
+  edges: List<Edge<T>>
+  pageInfo: PageInfo
+  totalCount: Int
+}
+
+"""Generic edge type for connections"""
+type Edge<T> {
+  cursor: String
+  node: T
+}
+
+"""Pagination info"""
+type PageInfo {
+  hasNextPage: Boolean
+  hasPreviousPage: Boolean
+  startCursor: Option<String>
+  endCursor: Option<String>
+}
+
+# =============================================================================
+# Error Types (Typed Errors - BGQL Feature)
+# =============================================================================
+
+interface Error {
+  message: String
+  code: String
+}
+
+type NotFoundError implements Error {
+  message: String
+  code: String
+  resourceType: String
+  resourceId: ID
+}
+
+type ValidationError implements Error {
+  message: String
+  code: String
+  field: String
+  constraint: String
+}
+
+type UnauthorizedError implements Error {
+  message: String
+  code: String
+  requiredRole: Option<Role>
+}
+
+type RateLimitError implements Error {
+  message: String
+  code: String
+  retryAfter: Int
+  limit: Int
+  window: String
+}
+
+type AuthenticationError implements Error {
+  message: String
+  code: String
+  reason: String
+}
+
+# =============================================================================
+# Domain Types
+# =============================================================================
+
+"""User account in the system"""
+type User {
+  id: UserId
+  name: String
+  email: String @boundary(server: true)
+  bio: Option<String>
+  avatarUrl: Option<String>
+  role: Role
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+
+  # Relations - uses DataLoader to prevent N+1
+  posts(status: Option<PostStatus>): List<Post>
+  postsCount: Int
+  followers: Connection<User> @stream(label: "followers", initialCount: 10)
+  following: Connection<User>
+
+  # Deferred analytics data (expensive to compute)
+  analytics: UserAnalytics @defer(label: "userAnalytics") @requireAuth(roles: [Admin, Editor])
+
+  # Server-only sensitive data
+  internalNotes: Option<String> @boundary(server: true, serialize: NEVER)
+}
+
+"""User analytics data (computed on demand)"""
+type UserAnalytics @priority(level: 8) @resources(cpu: 0.3, io: HIGH) {
+  totalViews: Int
+  totalLikes: Int
+  engagementRate: Float
+  topPosts: List<Post>
+  viewsByDay: List<DailyStats>
+}
+
+type DailyStats {
+  date: DateTime
+  views: Int
+  likes: Int
+}
+
+"""Blog post"""
+type Post {
+  id: PostId
+  title: String
+  content: String
+  excerpt: Option<String>
+  status: PostStatus
+  coverImage: Option<BinaryData> @binary(progressive: true, chunkSize: 65536)
+  tags: List<String>
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+  publishedAt: Option<DateTime>
+
+  # Relations
+  author: User
+  authorId: UserId
+  comments: Connection<Comment> @stream(label: "comments", initialCount: 5)
+  relatedPosts: List<Post> @defer(label: "relatedPosts")
+
+  # Metrics
+  viewCount: Int @cache(maxAge: 60, scope: Public)
+  likeCount: Int @cache(maxAge: 30, scope: Public)
+}
+
+"""Comment on a post"""
+type Comment {
+  id: CommentId
+  content: String
+  createdAt: DateTime
+  updatedAt: Option<DateTime>
+
+  author: User
+  authorId: UserId
+  post: Post
+  postId: PostId
+
+  # Nested comments
+  replies: List<Comment> @stream(label: "replies", initialCount: 3)
+  replyCount: Int
+}
+
+"""Binary data with streaming support"""
+type BinaryData {
+  url: String
+  mimeType: String
+  size: Int
+  checksum: String
+}
+
+"""Real-time notification"""
+type Notification {
+  id: ID
+  type: NotificationType
+  message: String
+  read: Boolean
+  createdAt: DateTime
+
+  # Polymorphic reference
+  target: NotificationTarget
+}
+
+union NotificationTarget = Post | Comment | User
+
+# =============================================================================
+# Input Types with Validation Directives (BGQL Feature)
+# =============================================================================
+
+"""Credentials for email/password login"""
+input EmailCredentials {
+  email: String @email @trim @lowercase
+  password: String @minLength(8) @maxLength(128)
+}
+
+"""Credentials for OAuth login"""
+input OAuthCredentials {
+  provider: String
+  token: String @minLength(1)
+  refreshToken: Option<String>
+}
+
+"""Input union for login - accepts multiple credential types"""
+input union LoginCredentials = EmailCredentials | OAuthCredentials
+
+"""Input for creating a new user"""
+input CreateUserInput {
+  name: String @minLength(2) @maxLength(100) @trim
+  email: String @email @trim @lowercase
+  password: String @minLength(8) @maxLength(128) @pattern(regex: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)")
+  bio: Option<String> @maxLength(500) @sanitize
+}
+
+"""Input for creating a new post"""
+input CreatePostInput {
+  title: String @minLength(1) @maxLength(200) @trim
+  content: String @minLength(10) @sanitize
+  excerpt: Option<String> @maxLength(300) @trim
+  tags: List<String> @maxLength(10)
+  status: PostStatus = Draft
+  coverImage: Option<Upload>
+}
+
+"""Input for updating a post"""
+input UpdatePostInput {
+  title: Option<String> @minLength(1) @maxLength(200) @trim
+  content: Option<String> @minLength(10) @sanitize
+  excerpt: Option<String> @maxLength(300) @trim
+  tags: Option<List<String>> @maxLength(10)
+  status: Option<PostStatus>
+}
+
+"""Input for creating a comment"""
+input CreateCommentInput {
+  content: String @minLength(1) @maxLength(5000) @sanitize
+  postId: PostId
+  parentId: Option<CommentId>
+}
+
+"""Filter for posts"""
+input PostFilter {
+  status: Option<PostStatus>
+  authorId: Option<UserId>
+  tags: Option<List<String>>
+  search: Option<String> @trim
+  fromDate: Option<DateTime>
+  toDate: Option<DateTime>
+}
+
+"""Pagination input"""
+input PaginationInput {
+  first: Int = 10 @min(1) @max(100)
+  after: Option<String>
+  last: Option<Int> @min(1) @max(100)
+  before: Option<String>
+}
+
+# =============================================================================
+# Result Types (Union with Error Types - BGQL Feature)
+# =============================================================================
+
+union UserResult = User | NotFoundError
+union PostResult = Post | NotFoundError
+union CommentResult = Comment | NotFoundError
+
+union LoginResult = Session | AuthenticationError | ValidationError | RateLimitError
+union CreateUserResult = User | ValidationError
+union CreatePostResult = Post | ValidationError | UnauthorizedError
+union UpdatePostResult = Post | NotFoundError | ValidationError | UnauthorizedError
+union DeleteResult = DeleteSuccess | NotFoundError | UnauthorizedError
+union CreateCommentResult = Comment | ValidationError | UnauthorizedError | NotFoundError
+
+type DeleteSuccess {
+  success: Boolean
+  deletedId: ID
+}
+
+type Session {
+  id: SessionId
+  token: String
+  refreshToken: String
+  expiresAt: DateTime
+  user: User
+}
+
+# =============================================================================
+# Scalar Types
+# =============================================================================
+
+scalar DateTime
+scalar Upload
+scalar JSON
+
+# =============================================================================
+# Query Type
+# =============================================================================
+
+type Query {
+  # ===== User Queries =====
+
+  """Get current authenticated user"""
+  me: UserResult @requireAuth
+
+  """Get user by ID"""
+  user(id: UserId): UserResult @cache(maxAge: 300, scope: Public)
+
+  """Get all users with pagination"""
+  users(pagination: PaginationInput): Connection<User> @cache(maxAge: 60, scope: Public)
+
+  # ===== Post Queries =====
+
+  """Get post by ID"""
+  post(id: PostId): PostResult @cache(maxAge: 120, scope: Public)
+
+  """Get posts with filtering and pagination"""
+  posts(
+    filter: Option<PostFilter>
+    pagination: PaginationInput
+  ): Connection<Post> @cache(maxAge: 60, scope: Public)
+
+  """Get posts feed with streaming"""
+  feed(pagination: PaginationInput): Connection<Post>
+    @stream(label: "feed", initialCount: 5)
+    @requireAuth
+    @priority(level: 2)
+
+  """Search posts"""
+  searchPosts(
+    query: String @minLength(2) @maxLength(100) @trim
+    pagination: PaginationInput
+  ): Connection<Post> @rateLimit(requests: 30, window: "1m")
+
+  # ===== Comment Queries =====
+
+  """Get comment by ID"""
+  comment(id: CommentId): CommentResult
+
+  # ===== Analytics Queries =====
+
+  """Get site-wide analytics (admin only)"""
+  siteAnalytics: SiteAnalytics
+    @requireAuth(roles: [Admin])
+    @defer(label: "siteAnalytics")
+    @priority(level: 10)
+    @resources(cpu: 0.5, io: HIGH, network: MEDIUM)
+
+  # ===== Resumable Query =====
+
+  """Export all user data (resumable for large datasets)"""
+  exportUserData(userId: UserId): DataExport
+    @requireAuth(roles: [Admin])
+    @resumable(ttl: 3600, checkpointInterval: 100)
+    @priority(level: 10)
+}
+
+type SiteAnalytics {
+  totalUsers: Int
+  totalPosts: Int
+  totalComments: Int
+  activeUsers24h: Int
+  newUsersToday: Int
+  popularTags: List<TagStats>
+  trafficByHour: List<HourlyStats>
+}
+
+type TagStats {
+  tag: String
+  count: Int
+}
+
+type HourlyStats {
+  hour: Int
+  requests: Int
+}
+
+type DataExport {
+  id: ID
+  status: ExportStatus
+  progress: Float
+  downloadUrl: Option<String>
+  expiresAt: Option<DateTime>
+}
+
+enum ExportStatus {
+  Pending
+  Processing
+  Completed
+  Failed
+}
+
+# =============================================================================
+# Mutation Type
+# =============================================================================
+
+type Mutation {
+  # ===== Auth Mutations =====
+
+  """Login with credentials"""
+  login(credentials: LoginCredentials): LoginResult @rateLimit(requests: 5, window: "1m")
+
+  """Logout current session"""
+  logout: Boolean @requireAuth
+
+  """Refresh authentication token"""
+  refreshToken(refreshToken: String): LoginResult @rateLimit(requests: 10, window: "1m")
+
+  # ===== User Mutations =====
+
+  """Register a new user"""
+  createUser(input: CreateUserInput): CreateUserResult @rateLimit(requests: 3, window: "1h")
+
+  """Update current user profile"""
+  updateProfile(input: UpdateUserInput): UserResult @requireAuth
+
+  """Follow a user"""
+  followUser(userId: UserId): UserResult @requireAuth
+
+  """Unfollow a user"""
+  unfollowUser(userId: UserId): UserResult @requireAuth
+
+  # ===== Post Mutations =====
+
+  """Create a new post"""
+  createPost(input: CreatePostInput): CreatePostResult @requireAuth(roles: [Admin, Editor, Author])
+
+  """Update an existing post"""
+  updatePost(id: PostId, input: UpdatePostInput): UpdatePostResult @requireAuth(roles: [Admin, Editor, Author])
+
+  """Delete a post"""
+  deletePost(id: PostId): DeleteResult @requireAuth(roles: [Admin, Editor, Author])
+
+  """Publish a draft post"""
+  publishPost(id: PostId): UpdatePostResult @requireAuth(roles: [Admin, Editor, Author])
+
+  """Like a post"""
+  likePost(id: PostId): PostResult @requireAuth
+
+  """Unlike a post"""
+  unlikePost(id: PostId): PostResult @requireAuth
+
+  # ===== Comment Mutations =====
+
+  """Create a comment on a post"""
+  createComment(input: CreateCommentInput): CreateCommentResult @requireAuth
+
+  """Update a comment"""
+  updateComment(id: CommentId, content: String @minLength(1) @maxLength(5000) @sanitize): CommentResult @requireAuth
+
+  """Delete a comment"""
+  deleteComment(id: CommentId): DeleteResult @requireAuth
+}
+
+input UpdateUserInput {
+  name: Option<String> @minLength(2) @maxLength(100) @trim
+  bio: Option<String> @maxLength(500) @sanitize
+  avatarUrl: Option<String> @url
+}
+
+# =============================================================================
+# Subscription Type
+# =============================================================================
+
+type Subscription {
+  """Subscribe to new posts"""
+  postCreated: Post @requireAuth
+
+  """Subscribe to new comments on a post"""
+  commentAdded(postId: PostId): Comment @requireAuth
+
+  """Subscribe to notifications for current user"""
+  notifications: Notification @requireAuth
+
+  """Subscribe to post updates"""
+  postUpdated(postId: PostId): Post
+}
+
+# =============================================================================
+# Server Fragments (BGQL Feature: @server directive)
+# =============================================================================
+
+"""
+Server-side fragment for admin dashboard data.
+This data never leaves the server and is rendered server-side only.
+"""
+fragment AdminDashboard on Query @server(isolate: true, cache: REQUEST, prerender: false) {
+  siteAnalytics {
+    totalUsers
+    totalPosts
+    activeUsers24h
+  }
+  users(pagination: { first: 10 }) {
+    edges {
+      node {
+        id
+        name
+        email
+        internalNotes
+      }
+    }
+  }
+}
+
+"""
+Server fragment for SEO metadata generation.
+Pre-rendered and cached at the edge.
+"""
+fragment PostSEO on Post @server(isolate: true, cache: GLOBAL, prerender: true) {
+  title
+  excerpt
+  author {
+    name
+  }
+  publishedAt
+  tags
+}
+
+# =============================================================================
+# Island Fragments (BGQL Feature: @island directive for partial hydration)
+# =============================================================================
+
+"""
+Interactive comments section - hydrates on visibility.
+"""
+fragment CommentsIsland on Post @island(name: "CommentsSection", hydrate: VISIBLE, clientBundle: "comments.js") {
+  id
+  comments(pagination: { first: 10 }) {
+    edges {
+      node {
+        id
+        content
+        author {
+          id
+          name
+          avatarUrl
+        }
+        createdAt
+        replies {
+          id
+          content
+          author {
+            id
+            name
+          }
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+"""
+Interactive like button - hydrates immediately for interactivity.
+"""
+fragment LikeButton on Post @island(name: "LikeButton", hydrate: IMMEDIATE, clientBundle: "like-button.js") {
+  id
+  likeCount
+}

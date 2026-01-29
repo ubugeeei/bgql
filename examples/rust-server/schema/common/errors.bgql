@@ -1,0 +1,74 @@
+# =============================================================================
+# Common Error Types
+# =============================================================================
+# Demonstrates: typed errors, interfaces, versioning
+
+use::scalars::*
+
+"""Base error interface - all errors implement this"""
+pub interface Error {
+  message: String
+  code: String
+}
+
+"""Resource not found"""
+pub type NotFoundError implements Error {
+  message: String
+  code: String  # "NOT_FOUND"
+  resourceType: String
+  resourceId: ID
+}
+
+"""Validation failed"""
+pub type ValidationError implements Error {
+  message: String
+  code: String  # "VALIDATION_ERROR"
+  field: String
+  constraint: String
+  value: Option<String>  # The invalid value (sanitized)
+}
+
+"""Multiple validation errors"""
+pub type ValidationErrors implements Error {
+  message: String
+  code: String  # "VALIDATION_ERRORS"
+  errors: List<ValidationError>
+}
+
+"""Authentication required"""
+pub type UnauthorizedError implements Error {
+  message: String
+  code: String  # "UNAUTHORIZED"
+}
+
+"""Permission denied"""
+pub type ForbiddenError implements Error {
+  message: String
+  code: String  # "FORBIDDEN"
+  requiredPermission: Option<String>
+  requiredRoles: Option<List<String>>
+}
+
+"""Rate limit exceeded"""
+pub type RateLimitError implements Error {
+  message: String
+  code: String  # "RATE_LIMIT_EXCEEDED"
+  retryAfter: Int  # seconds
+  limit: Int
+  window: String   # e.g., "1h", "1m"
+}
+
+"""Resource already exists"""
+pub type ConflictError implements Error {
+  message: String
+  code: String  # "CONFLICT"
+  conflictingField: String
+  existingValue: String
+}
+
+"""Generic success response"""
+pub type DeleteSuccess {
+  success: Boolean
+  deletedId: ID
+  deletedAt: DateTime
+}

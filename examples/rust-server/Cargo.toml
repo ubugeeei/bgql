@@ -1,0 +1,22 @@
+[package]
+name = "bgql-example-server"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+[dependencies]
+bgql_sdk = { path = "../../sdk/rust" }
+bgql_core = { path = "../../crates/bgql_core" }
+bgql_runtime = { path = "../../crates/bgql_runtime" }
+bytes = "1.5"
+
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hyper = { version = "1.4", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["server", "tokio"] }
+http-body-util = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
