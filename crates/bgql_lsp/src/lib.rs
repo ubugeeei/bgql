@@ -18,10 +18,7 @@ mod symbols;
 
 use async_trait::async_trait;
 use bgql_core::Interner;
-<<<<<<< HEAD
-=======
 use bgql_semantic::{checker, hir::HirDatabase, types::TypeRegistry};
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 use bgql_syntax::{format, parse, Definition, TypeDefinition};
 use std::sync::Arc;
 use symbols::{
@@ -31,10 +28,7 @@ use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
-<<<<<<< HEAD
-=======
 #[allow(unused_imports)]
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 use tracing::info;
 
 use crate::state::ServerState;
@@ -74,12 +68,8 @@ impl BgqlLanguageServer {
         let interner = Interner::new();
         let result = parse(content, &interner);
 
-<<<<<<< HEAD
-        result
-=======
         // Collect parser diagnostics
         let mut diagnostics: Vec<Diagnostic> = result
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
             .diagnostics
             .iter()
             .filter_map(|diag| {
@@ -100,9 +90,6 @@ impl BgqlLanguageServer {
                     ..Default::default()
                 })
             })
-<<<<<<< HEAD
-            .collect()
-=======
             .collect();
 
         // Run type checker if no parser errors
@@ -133,7 +120,6 @@ impl BgqlLanguageServer {
         }
 
         diagnostics
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     }
 
     fn find_definition_location(
@@ -218,12 +204,6 @@ impl LanguageServer for BgqlLanguageServer {
                         "(".to_string(),
                         "<".to_string(),
                         " ".to_string(),
-<<<<<<< HEAD
-                    ]),
-                    resolve_provider: Some(false),
-                    ..Default::default()
-                }),
-=======
                         ",".to_string(),
                     ]),
                     resolve_provider: Some(true),
@@ -234,15 +214,12 @@ impl LanguageServer for BgqlLanguageServer {
                     retrigger_characters: Some(vec![",".to_string()]),
                     work_done_progress_options: Default::default(),
                 }),
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Left(true)),
-<<<<<<< HEAD
-=======
                 semantic_tokens_provider: Some(
                     SemanticTokensServerCapabilities::SemanticTokensOptions(
                         SemanticTokensOptions {
@@ -282,7 +259,6 @@ impl LanguageServer for BgqlLanguageServer {
                 ),
                 inlay_hint_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -573,8 +549,6 @@ impl LanguageServer for BgqlLanguageServer {
             ..Default::default()
         }))
     }
-<<<<<<< HEAD
-=======
 
     async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
         let uri = &params.text_document_position_params.text_document.uri;
@@ -766,7 +740,9 @@ fn get_directive_signatures(name: &str) -> Vec<SignatureInformation> {
             )),
             parameters: Some(vec![ParameterInformation {
                 label: ParameterLabel::Simple("regex: String".to_string()),
-                documentation: Some(Documentation::String("Regular expression pattern".to_string())),
+                documentation: Some(Documentation::String(
+                    "Regular expression pattern".to_string(),
+                )),
             }]),
             active_parameter: None,
         }],
@@ -914,9 +890,9 @@ fn compute_semantic_tokens(
 
                 let token_type = match type_def {
                     TypeDefinition::Interface(_) => 3, // INTERFACE
-                    TypeDefinition::Enum(_) => 2,     // ENUM
-                    TypeDefinition::Input(_) => 4,    // STRUCT
-                    _ => 1,                           // CLASS
+                    TypeDefinition::Enum(_) => 2,      // ENUM
+                    TypeDefinition::Input(_) => 4,     // STRUCT
+                    _ => 1,                            // CLASS
                 };
 
                 tokens.push(SemanticToken {
@@ -1005,11 +981,7 @@ fn compute_inlay_hints(
 // Code Actions (Quick Fixes)
 // =============================================================================
 
-fn generate_quick_fix(
-    content: &str,
-    diagnostic: &Diagnostic,
-    uri: &Url,
-) -> Option<CodeAction> {
+fn generate_quick_fix(content: &str, diagnostic: &Diagnostic, uri: &Url) -> Option<CodeAction> {
     // Check for "Undefined type" errors - suggest adding the type
     if diagnostic.message.contains("Undefined type") {
         // Extract the type name from the message
@@ -1069,7 +1041,6 @@ fn generate_quick_fix(
     }
 
     None
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 /// Runs the language server.

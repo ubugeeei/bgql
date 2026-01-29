@@ -237,48 +237,54 @@ pub(crate) async fn run_server(server: Arc<BgqlServer>) -> SdkResult<()> {
                     let config = server.config();
                     let (parts, body) = req.into_parts();
 
-                    let response: Response<BoxBody> =
-                        match (parts.method.clone(), parts.uri.path()) {
-                            (Method::GET, "/health") => Response::builder()
+                    let response: Response<BoxBody> = match (parts.method.clone(), parts.uri.path())
+                    {
+                        (Method::GET, "/health") => Response::builder()
+                            .status(StatusCode::OK)
+                            .header("Content-Type", "application/json")
+                            .body(full(health_response()))
+                            .unwrap(),
+
+                        (Method::GET, "/.well-known/bgql") => Response::builder()
+                            .status(StatusCode::OK)
+                            .header("Content-Type", "application/json")
+                            .body(full(well_known_bgql(config)))
+                            .unwrap(),
+
+                        (Method::POST, "/bgql") => {
+                            let body_bytes = body
+                                .collect()
+                                .await
+                                .map(|c| c.to_bytes())
+                                .unwrap_or_default();
+                            handle_graphql_request(body_bytes, &server).await
+                        }
+
+                        (Method::GET, "/bgql") | (Method::GET, "/") if config.playground => {
+                            Response::builder()
                                 .status(StatusCode::OK)
-                                .header("Content-Type", "application/json")
-                                .body(full(health_response()))
-                                .unwrap(),
+                                .header("Content-Type", "text/html; charset=utf-8")
+                                .body(full(playground_html("/bgql")))
+                                .unwrap()
+                        }
 
-                            (Method::GET, "/.well-known/bgql") => Response::builder()
-                                .status(StatusCode::OK)
-                                .header("Content-Type", "application/json")
-                                .body(full(well_known_bgql(config)))
-                                .unwrap(),
+                        (Method::OPTIONS, "/bgql") => Response::builder()
+                            .status(StatusCode::OK)
+                            .header("Access-Control-Allow-Origin", "*")
+                            .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                            .header(
+                                "Access-Control-Allow-Headers",
+                                "Content-Type, Authorization",
+                            )
+                            .body(full(""))
+                            .unwrap(),
 
-                            (Method::POST, "/bgql") => {
-                                let body_bytes =
-                                    body.collect().await.map(|c| c.to_bytes()).unwrap_or_default();
-                                handle_graphql_request(body_bytes, &server).await
-                            }
-
-                            (Method::GET, "/bgql") | (Method::GET, "/") if config.playground => {
-                                Response::builder()
-                                    .status(StatusCode::OK)
-                                    .header("Content-Type", "text/html; charset=utf-8")
-                                    .body(full(playground_html("/bgql")))
-                                    .unwrap()
-                            }
-
-                            (Method::OPTIONS, "/bgql") => Response::builder()
-                                .status(StatusCode::OK)
-                                .header("Access-Control-Allow-Origin", "*")
-                                .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                                .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-                                .body(full(""))
-                                .unwrap(),
-
-                            _ => Response::builder()
-                                .status(StatusCode::NOT_FOUND)
-                                .header("Content-Type", "application/json")
-                                .body(full(r#"{"error":"Not Found"}"#))
-                                .unwrap(),
-                        };
+                        _ => Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header("Content-Type", "application/json")
+                            .body(full(r#"{"error":"Not Found"}"#))
+                            .unwrap(),
+                    };
 
                     Ok::<_, Infallible>(response)
                 }

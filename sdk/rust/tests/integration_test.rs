@@ -1,8 +1,8 @@
 //! Integration tests for bgql_sdk
 
-use bgql_sdk::server::{BgqlServer, Context, ServerConfig, create_loader};
 use bgql_sdk::client::ClientConfig;
 use bgql_sdk::error::{ErrorCode, SdkError};
+use bgql_sdk::server::{create_loader, BgqlServer, Context, ServerConfig};
 use std::time::Duration;
 
 /// Test schema parsing and query execution
@@ -55,11 +55,13 @@ async fn test_complete_schema_parsing() {
     let server = server.unwrap();
 
     // Test simple query
-    let result = server.execute(
-        "query { user(id: \"1\") { id name email } }",
-        None,
-        Context::new(),
-    ).await;
+    let result = server
+        .execute(
+            "query { user(id: \"1\") { id name email } }",
+            None,
+            Context::new(),
+        )
+        .await;
 
     assert!(result.is_ok(), "Query should execute successfully");
     let data = result.unwrap();
@@ -72,7 +74,8 @@ async fn test_complete_schema_parsing() {
 #[tokio::test]
 async fn test_query_with_variables() {
     let server = BgqlServer::builder()
-        .schema_sdl(r#"
+        .schema_sdl(
+            r#"
             type Query {
                 user(id: ID): User
             }
@@ -80,7 +83,8 @@ async fn test_query_with_variables() {
                 id: ID
                 name: String
             }
-        "#)
+        "#,
+        )
         .resolver("Query", "user", |args, _ctx| async move {
             let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("default");
             Ok(serde_json::json!({
@@ -91,11 +95,13 @@ async fn test_query_with_variables() {
         .build()
         .unwrap();
 
-    let result = server.execute(
-        "query GetUser($id: ID) { user(id: $id) { id name } }",
-        Some(serde_json::json!({"id": "42"})),
-        Context::new(),
-    ).await;
+    let result = server
+        .execute(
+            "query GetUser($id: ID) { user(id: $id) { id name } }",
+            Some(serde_json::json!({"id": "42"})),
+            Context::new(),
+        )
+        .await;
 
     assert!(result.is_ok());
 }
@@ -145,11 +151,13 @@ async fn test_dataloader_batching() {
     });
 
     // Load multiple values at once
-    let results = loader.load_many(vec![
-        "key1".to_string(),
-        "key2".to_string(),
-        "key3".to_string(),
-    ]).await;
+    let results = loader
+        .load_many(vec![
+            "key1".to_string(),
+            "key2".to_string(),
+            "key3".to_string(),
+        ])
+        .await;
 
     assert_eq!(results.get("key1"), Some(&"Value for key1".to_string()));
     assert_eq!(results.get("key2"), Some(&"Value for key2".to_string()));
@@ -170,7 +178,10 @@ fn test_client_configuration() {
     assert_eq!(config.timeout, Duration::from_secs(60));
     assert_eq!(config.max_retries, 5);
     assert_eq!(config.retry_delay_ms, 200);
-    assert_eq!(config.headers.get("Authorization"), Some(&"Bearer token".to_string()));
+    assert_eq!(
+        config.headers.get("Authorization"),
+        Some(&"Bearer token".to_string())
+    );
     assert_eq!(config.headers.get("X-Request-Id"), Some(&"123".to_string()));
 }
 
@@ -178,20 +189,18 @@ fn test_client_configuration() {
 #[tokio::test]
 async fn test_error_handling() {
     let server = BgqlServer::builder()
-        .schema_sdl(r#"
+        .schema_sdl(
+            r#"
             type Query {
                 fail: String
             }
-        "#)
+        "#,
+        )
         .build()
         .unwrap();
 
     // Query for a field that doesn't have a resolver should use default resolver
-    let result = server.execute(
-        "query { fail }",
-        None,
-        Context::new(),
-    ).await;
+    let result = server.execute("query { fail }", None, Context::new()).await;
 
     assert!(result.is_ok());
     let data = result.unwrap();
@@ -203,20 +212,24 @@ async fn test_error_handling() {
 #[tokio::test]
 async fn test_parse_error() {
     let server = BgqlServer::builder()
-        .schema_sdl(r#"
+        .schema_sdl(
+            r#"
             type Query {
                 hello: String
             }
-        "#)
+        "#,
+        )
         .build()
         .unwrap();
 
     // Invalid query syntax
-    let result = server.execute(
-        "query { hello",  // Missing closing brace
-        None,
-        Context::new(),
-    ).await;
+    let result = server
+        .execute(
+            "query { hello", // Missing closing brace
+            None,
+            Context::new(),
+        )
+        .await;
 
     assert!(result.is_err());
     let err = result.unwrap_err();
@@ -227,7 +240,8 @@ async fn test_parse_error() {
 #[tokio::test]
 async fn test_nested_query() {
     let server = BgqlServer::builder()
-        .schema_sdl(r#"
+        .schema_sdl(
+            r#"
             type Query {
                 user: User
             }
@@ -240,7 +254,8 @@ async fn test_nested_query() {
                 bio: String
                 avatar: String
             }
-        "#)
+        "#,
+        )
         .resolver("Query", "user", |_args, _ctx| async move {
             Ok(serde_json::json!({
                 "id": "1",
@@ -254,11 +269,13 @@ async fn test_nested_query() {
         .build()
         .unwrap();
 
-    let result = server.execute(
-        "query { user { id name profile { bio avatar } } }",
-        None,
-        Context::new(),
-    ).await;
+    let result = server
+        .execute(
+            "query { user { id name profile { bio avatar } } }",
+            None,
+            Context::new(),
+        )
+        .await;
 
     assert!(result.is_ok());
     let data = result.unwrap();
@@ -271,7 +288,8 @@ async fn test_nested_query() {
 #[tokio::test]
 async fn test_list_field() {
     let server = BgqlServer::builder()
-        .schema_sdl(r#"
+        .schema_sdl(
+            r#"
             type Query {
                 users: List<User>
             }
@@ -279,7 +297,8 @@ async fn test_list_field() {
                 id: ID
                 name: String
             }
-        "#)
+        "#,
+        )
         .resolver("Query", "users", |_args, _ctx| async move {
             Ok(serde_json::json!([
                 {"id": "1", "name": "Alice"},
@@ -290,11 +309,9 @@ async fn test_list_field() {
         .build()
         .unwrap();
 
-    let result = server.execute(
-        "query { users { id name } }",
-        None,
-        Context::new(),
-    ).await;
+    let result = server
+        .execute("query { users { id name } }", None, Context::new())
+        .await;
 
     assert!(result.is_ok());
     let data = result.unwrap();
@@ -309,7 +326,8 @@ async fn test_list_field() {
 #[tokio::test]
 async fn test_typename_introspection() {
     let server = BgqlServer::builder()
-        .schema_sdl(r#"
+        .schema_sdl(
+            r#"
             type Query {
                 user: User
             }
@@ -317,7 +335,8 @@ async fn test_typename_introspection() {
                 id: ID
                 name: String
             }
-        "#)
+        "#,
+        )
         .resolver("Query", "user", |_args, _ctx| async move {
             Ok(serde_json::json!({
                 "id": "1",
@@ -327,11 +346,13 @@ async fn test_typename_introspection() {
         .build()
         .unwrap();
 
-    let result = server.execute(
-        "query { user { __typename id name } }",
-        None,
-        Context::new(),
-    ).await;
+    let result = server
+        .execute(
+            "query { user { __typename id name } }",
+            None,
+            Context::new(),
+        )
+        .await;
 
     assert!(result.is_ok());
     let data = result.unwrap();

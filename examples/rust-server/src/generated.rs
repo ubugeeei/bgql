@@ -266,11 +266,31 @@ pub trait QueryResolvers: Send + Sync + 'static {
 /// Mutation resolvers trait.
 #[async_trait]
 pub trait MutationResolvers: Send + Sync + 'static {
-    async fn create_post(&self, ctx: &Context, args: CreatePostArgs) -> SdkResult<serde_json::Value>;
-    async fn update_post(&self, ctx: &Context, args: UpdatePostArgs) -> SdkResult<serde_json::Value>;
-    async fn publish_post(&self, ctx: &Context, args: PublishPostArgs) -> SdkResult<serde_json::Value>;
-    async fn delete_post(&self, ctx: &Context, args: DeletePostArgs) -> SdkResult<serde_json::Value>;
-    async fn create_comment(&self, ctx: &Context, args: CreateCommentArgs) -> SdkResult<serde_json::Value>;
+    async fn create_post(
+        &self,
+        ctx: &Context,
+        args: CreatePostArgs,
+    ) -> SdkResult<serde_json::Value>;
+    async fn update_post(
+        &self,
+        ctx: &Context,
+        args: UpdatePostArgs,
+    ) -> SdkResult<serde_json::Value>;
+    async fn publish_post(
+        &self,
+        ctx: &Context,
+        args: PublishPostArgs,
+    ) -> SdkResult<serde_json::Value>;
+    async fn delete_post(
+        &self,
+        ctx: &Context,
+        args: DeletePostArgs,
+    ) -> SdkResult<serde_json::Value>;
+    async fn create_comment(
+        &self,
+        ctx: &Context,
+        args: CreateCommentArgs,
+    ) -> SdkResult<serde_json::Value>;
 }
 
 // =============================================================================

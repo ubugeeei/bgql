@@ -1,26 +1,18 @@
 //! Query planning for Better GraphQL.
 
-<<<<<<< HEAD
-use crate::schema::Schema;
-use bgql_semantic::hir::HirOperation;
-
-/// Query planner configuration.
-#[derive(Debug, Clone, Default)]
-=======
 use crate::schema::{FieldDef, ObjectDef, Schema, TypeDef, TypeRef};
-use bgql_semantic::hir::{HirFieldSelection, HirOperation, HirOperationKind, HirSelection, HirValue};
+use bgql_semantic::hir::{
+    HirFieldSelection, HirOperation, HirOperationKind, HirSelection, HirValue,
+};
 use std::collections::HashSet;
 
 /// Query planner configuration.
 #[derive(Debug, Clone)]
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 pub struct PlannerConfig {
     /// Maximum query depth.
     pub max_depth: usize,
     /// Maximum query complexity.
     pub max_complexity: usize,
-<<<<<<< HEAD
-=======
     /// Enable parallel execution of sibling fields.
     pub enable_parallel: bool,
     /// Minimum fields to parallelize.
@@ -36,16 +28,11 @@ impl Default for PlannerConfig {
             parallel_threshold: 2,
         }
     }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 /// The query planner.
 #[derive(Debug)]
 pub struct QueryPlanner {
-<<<<<<< HEAD
-    #[allow(dead_code)]
-=======
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     config: PlannerConfig,
 }
 
@@ -69,23 +56,7 @@ impl QueryPlanner {
     }
 
     /// Plans a query.
-    pub fn plan(
-        &self,
-<<<<<<< HEAD
-        _operation: &HirOperation,
-        _schema: &Schema,
-    ) -> Result<QueryPlan, PlanError> {
-        // TODO: Implement query planning
-        Ok(QueryPlan {
-            root: PlanNode::Leaf {
-                field: "query".to_string(),
-            },
-        })
-    }
-=======
-        operation: &HirOperation,
-        schema: &Schema,
-    ) -> Result<QueryPlan, PlanError> {
+    pub fn plan(&self, operation: &HirOperation, schema: &Schema) -> Result<QueryPlan, PlanError> {
         let root_type_name = match operation.kind {
             HirOperationKind::Query => schema.query_type.as_deref(),
             HirOperationKind::Mutation => schema.mutation_type.as_deref(),
@@ -173,17 +144,20 @@ impl QueryPlanner {
                     ctx.visited_fragments.insert(name.clone());
                     // Fragment spreading would be resolved during execution
                     // For now, we create a placeholder
-                    field_nodes.push(PlanNode::FragmentSpread {
-                        name: name.clone(),
-                    });
+                    field_nodes.push(PlanNode::FragmentSpread { name: name.clone() });
                 }
                 HirSelection::InlineFragment(inline) => {
                     // Handle inline fragments
                     if let Some(type_condition) = &inline.type_condition {
-                        if let Some(TypeDef::Object(cond_type)) = ctx.schema.get_type(type_condition)
+                        if let Some(TypeDef::Object(cond_type)) =
+                            ctx.schema.get_type(type_condition)
                         {
-                            let inner =
-                                self.plan_selections(&inline.selections, cond_type, type_condition, ctx)?;
+                            let inner = self.plan_selections(
+                                &inline.selections,
+                                cond_type,
+                                type_condition,
+                                ctx,
+                            )?;
                             field_nodes.push(PlanNode::TypeCondition {
                                 type_name: type_condition.clone(),
                                 node: Box::new(inner),
@@ -237,12 +211,15 @@ impl QueryPlanner {
         }
 
         // Find field definition
-        let field_def = parent_type.fields.get(&field.name).ok_or_else(|| PlanError {
-            message: format!(
-                "Field '{}' not found on type '{}'",
-                field.name, parent_type_name
-            ),
-        })?;
+        let field_def = parent_type
+            .fields
+            .get(&field.name)
+            .ok_or_else(|| PlanError {
+                message: format!(
+                    "Field '{}' not found on type '{}'",
+                    field.name, parent_type_name
+                ),
+            })?;
 
         ctx.complexity += self.calculate_field_complexity(field_def, &field.arguments);
 
@@ -272,7 +249,8 @@ impl QueryPlanner {
                 if let TypeDef::Object(obj) = return_type {
                     ctx.depth += 1;
                     let max_depth = ctx.depth;
-                    let nested = self.plan_selections(&field.selections, obj, &return_type_name, ctx)?;
+                    let nested =
+                        self.plan_selections(&field.selections, obj, &return_type_name, ctx)?;
                     if ctx.depth == max_depth {
                         ctx.depth = max_depth;
                     }
@@ -386,7 +364,6 @@ struct PlanningContext<'a> {
     depth: usize,
     complexity: usize,
     visited_fragments: HashSet<String>,
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 /// A query plan.
@@ -394,8 +371,6 @@ struct PlanningContext<'a> {
 pub struct QueryPlan {
     /// The root node of the plan.
     pub root: PlanNode,
-<<<<<<< HEAD
-=======
     /// Operation name.
     pub operation_name: Option<String>,
     /// Operation kind.
@@ -441,7 +416,6 @@ impl FieldInfo {
     pub fn response_key(&self) -> &str {
         self.alias.as_deref().unwrap_or(&self.name)
     }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 /// A node in the query plan.
@@ -449,12 +423,6 @@ impl FieldInfo {
 pub enum PlanNode {
     /// Sequential execution.
     Sequence(Vec<PlanNode>),
-<<<<<<< HEAD
-    /// Parallel execution.
-    Parallel(Vec<PlanNode>),
-    /// A leaf field to resolve.
-    Leaf { field: String },
-=======
 
     /// Parallel execution.
     Parallel(Vec<PlanNode>),
@@ -473,26 +441,23 @@ pub enum PlanNode {
     FragmentSpread { name: String },
 
     /// A type condition (inline fragment or fragment).
-    TypeCondition { type_name: String, node: Box<PlanNode> },
+    TypeCondition {
+        type_name: String,
+        node: Box<PlanNode>,
+    },
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// A deferred node.
     Defer {
         node: Box<PlanNode>,
         label: Option<String>,
     },
-<<<<<<< HEAD
-=======
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// A streamed node.
     Stream {
         node: Box<PlanNode>,
         label: Option<String>,
         initial_count: usize,
     },
-<<<<<<< HEAD
-=======
 
     /// Conditional node (for @skip/@include).
     Conditional {
@@ -527,7 +492,6 @@ impl PlanNode {
             }
         }
     }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 /// A planning error.
@@ -543,8 +507,6 @@ impl std::fmt::Display for PlanError {
 }
 
 impl std::error::Error for PlanError {}
-<<<<<<< HEAD
-=======
 
 /// Gets the base type name from a TypeRef.
 fn get_base_type_name(ty: &TypeRef) -> String {
@@ -848,4 +810,3 @@ mod tests {
         assert_eq!(info_no_alias.response_key(), "userName");
     }
 }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9

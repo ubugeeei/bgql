@@ -11,11 +11,16 @@ pub struct UserService {
 
 impl UserService {
     pub fn new(user_repo: Arc<dyn UserRepository>, post_repo: Arc<dyn PostRepository>) -> Self {
-        Self { user_repo, post_repo }
+        Self {
+            user_repo,
+            post_repo,
+        }
     }
 
     pub async fn get_user(&self, id: &UserId) -> DomainResult<User> {
-        self.user_repo.find_by_id(id).await
+        self.user_repo
+            .find_by_id(id)
+            .await
             .ok_or_else(|| DomainError::UserNotFound(id.0.clone()))
     }
 
@@ -29,7 +34,10 @@ impl UserService {
         self.user_repo.find_all(pagination).await
     }
 
-    pub async fn get_users_by_ids(&self, ids: &[UserId]) -> std::collections::HashMap<UserId, User> {
+    pub async fn get_users_by_ids(
+        &self,
+        ids: &[UserId],
+    ) -> std::collections::HashMap<UserId, User> {
         self.user_repo.find_by_ids(ids).await
     }
 }
@@ -41,11 +49,16 @@ pub struct PostService {
 
 impl PostService {
     pub fn new(post_repo: Arc<dyn PostRepository>, user_repo: Arc<dyn UserRepository>) -> Self {
-        Self { post_repo, user_repo }
+        Self {
+            post_repo,
+            user_repo,
+        }
     }
 
     pub async fn get_post(&self, id: &PostId) -> DomainResult<Post> {
-        self.post_repo.find_by_id(id).await
+        self.post_repo
+            .find_by_id(id)
+            .await
             .ok_or_else(|| DomainError::PostNotFound(id.0.clone()))
     }
 
@@ -64,10 +77,16 @@ impl PostService {
             return Err(DomainError::validation("title", "Title is required"));
         }
         if input.title.len() > 200 {
-            return Err(DomainError::validation("title", "Title must be at most 200 characters"));
+            return Err(DomainError::validation(
+                "title",
+                "Title must be at most 200 characters",
+            ));
         }
         if input.content.len() < 10 {
-            return Err(DomainError::validation("content", "Content must be at least 10 characters"));
+            return Err(DomainError::validation(
+                "content",
+                "Content must be at least 10 characters",
+            ));
         }
 
         let post = Post {
@@ -90,18 +109,27 @@ impl PostService {
         }
 
         self.post_repo
-            .update(id, PostUpdate {
-                title: input.title,
-                content: input.content,
-                status: input.status,
-            })
+            .update(
+                id,
+                PostUpdate {
+                    title: input.title,
+                    content: input.content,
+                    status: input.status,
+                },
+            )
             .await
             .ok_or_else(|| DomainError::PostNotFound(id.0.clone()))
     }
 
     pub async fn publish_post(&self, id: &PostId) -> DomainResult<Post> {
         self.post_repo
-            .update(id, PostUpdate { status: Some(PostStatus::Published), ..Default::default() })
+            .update(
+                id,
+                PostUpdate {
+                    status: Some(PostStatus::Published),
+                    ..Default::default()
+                },
+            )
             .await
             .ok_or_else(|| DomainError::PostNotFound(id.0.clone()))
     }
@@ -121,8 +149,14 @@ pub struct CommentService {
 }
 
 impl CommentService {
-    pub fn new(comment_repo: Arc<dyn CommentRepository>, post_repo: Arc<dyn PostRepository>) -> Self {
-        Self { comment_repo, post_repo }
+    pub fn new(
+        comment_repo: Arc<dyn CommentRepository>,
+        post_repo: Arc<dyn PostRepository>,
+    ) -> Self {
+        Self {
+            comment_repo,
+            post_repo,
+        }
     }
 
     pub async fn create_comment(&self, input: CreateCommentInput) -> DomainResult<Comment> {

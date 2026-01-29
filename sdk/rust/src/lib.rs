@@ -64,48 +64,48 @@ pub mod typed;
 pub mod validation;
 
 // Re-export macros
-pub use bgql_macros::{TypedOperation, ContextKey, resolver, graphql, gql, args, resolvers};
+pub use bgql_macros::{args, gql, graphql, resolver, resolvers, ContextKey, TypedOperation};
 
 // Re-exports for convenience
 pub use client::{BgqlClient, ClientConfig, GraphQLOperation, Request, Response};
-pub use context::{TypedContext, ContextExt, SharedContext};
-pub use error::{ErrorCode, SdkError, SdkResult, ResultExt};
+pub use context::{ContextExt, SharedContext, TypedContext};
+pub use error::{ErrorCode, ResultExt, SdkError, SdkResult};
 pub use typed::{
-    TypedOperation, OperationKind, TypedResponse,
-    TypedResolver, ResolverBuilder, FromTypedContext,
-    NoVariables, NoArgs, Root,
-    GraphQLArgs, GraphQLOutput, GraphQLParent,
+    FromTypedContext, GraphQLArgs, GraphQLOutput, GraphQLParent, NoArgs, NoVariables,
+    OperationKind, ResolverBuilder, Root, TypedOperation, TypedResolver, TypedResponse,
 };
 
 // Legacy re-exports (deprecated, use error module instead)
 pub use result::{BgqlError, BgqlResult, Err, Ok, Result};
 
 // Server re-exports
-pub use server::{BgqlServer, Context, DataLoader, Resolver, ServerConfig, create_loader};
+pub use server::{create_loader, BgqlServer, Context, DataLoader, Resolver, ServerConfig};
 
 // Re-export runtime types that are commonly needed
-pub use bgql_runtime::schema::Schema;
 pub use bgql_runtime::executor::{ExecutorConfig, FieldError};
-pub use bgql_runtime::resolver::{ResolverArgs, ResolverInfo, ResolverMap, ResolverResult, ResolverError};
+pub use bgql_runtime::resolver::{
+    ResolverArgs, ResolverError, ResolverInfo, ResolverMap, ResolverResult,
+};
+pub use bgql_runtime::schema::Schema;
 
 // Streaming re-exports
 pub use streaming::{
-    StreamingResponse, DeferPayload, StreamPayload, PathSegment, IncrementalEvent,
-    ExecutionState, Checkpoint, IncrementalStream, IncrementalSender,
-    DeferPayloadBuilder, StreamPayloadBuilder, MultipartWriter,
+    Checkpoint, DeferPayload, DeferPayloadBuilder, ExecutionState, IncrementalEvent,
+    IncrementalSender, IncrementalStream, MultipartWriter, PathSegment, StreamPayload,
+    StreamPayloadBuilder, StreamingResponse,
 };
 
 // Directive re-exports
 pub use directives::{
-    DeferDirective, StreamDirective, BinaryDirective, ServerDirective, BoundaryDirective,
-    PriorityDirective, ResourcesDirective, ResumableDirective, IslandDirective, HydrateDirective,
-    CacheDirective, RateLimitDirective, RequireAuthDirective, ParsedDirectives,
-    CacheStrategy, CacheScope, ResourceLevel, HydrationStrategy, HydrationPriority,
+    BinaryDirective, BoundaryDirective, CacheDirective, CacheScope, CacheStrategy, DeferDirective,
+    HydrateDirective, HydrationPriority, HydrationStrategy, IslandDirective, ParsedDirectives,
+    PriorityDirective, RateLimitDirective, RequireAuthDirective, ResourceLevel, ResourcesDirective,
+    ResumableDirective, ServerDirective, StreamDirective,
 };
 
 // Validation re-exports
 pub use validation::{
-    Validate, Validator, ValidationError, ValidationErrors, ValidationErrorCode, ValidationResult,
+    Validate, ValidationError, ValidationErrorCode, ValidationErrors, ValidationResult, Validator,
 };
 
 // PubSub re-exports

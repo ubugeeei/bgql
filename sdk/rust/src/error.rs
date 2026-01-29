@@ -104,10 +104,7 @@ impl ErrorCode {
     pub const fn is_retryable(&self) -> bool {
         matches!(
             self,
-            Self::NetworkError
-                | Self::Timeout
-                | Self::ConnectionRefused
-                | Self::DnsResolution
+            Self::NetworkError | Self::Timeout | Self::ConnectionRefused | Self::DnsResolution
         )
     }
 
@@ -239,6 +236,11 @@ impl SdkError {
         Self::new(ErrorCode::InternalError, message)
     }
 
+    /// Creates a server error.
+    pub fn server(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::InternalError, message)
+    }
+
     /// Returns true if this error is retryable.
     pub fn is_retryable(&self) -> bool {
         self.code.is_retryable()
@@ -302,8 +304,7 @@ impl<T, E: std::error::Error> ResultExt<T> for std::result::Result<T, E> {
 
     fn map_sdk_err_with(self, code: ErrorCode, message: impl Into<String>) -> SdkResult<T> {
         self.map_err(|e| {
-            SdkError::new(code, message)
-                .with_extension("original_error", e.to_string())
+            SdkError::new(code, message).with_extension("original_error", e.to_string())
         })
     }
 }
@@ -326,8 +327,8 @@ mod tests {
 
     #[test]
     fn test_error_construction() {
-        let err = SdkError::new(ErrorCode::NotFound, "User not found")
-            .with_extension("user_id", "123");
+        let err =
+            SdkError::new(ErrorCode::NotFound, "User not found").with_extension("user_id", "123");
 
         assert_eq!(err.code, ErrorCode::NotFound);
         assert_eq!(err.message, "User not found");
@@ -344,8 +345,10 @@ mod tests {
 
     #[test]
     fn test_result_ext() {
-        let result: Result<(), std::io::Error> =
-            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"));
+        let result: Result<(), std::io::Error> = Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "file not found",
+        ));
 
         let sdk_result = result.map_sdk_err(ErrorCode::NotFound);
         assert!(sdk_result.is_err());

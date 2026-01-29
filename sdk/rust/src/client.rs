@@ -32,7 +32,7 @@
 //! ```
 
 use crate::error::{ErrorCode, SdkError, SdkResult};
-use crate::typed::{TypedOperation, TypedResponse, GraphQLError as TypedGraphQLError};
+use crate::typed::{GraphQLError as TypedGraphQLError, TypedOperation, TypedResponse};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -164,7 +164,12 @@ impl HttpClient {
         Self { timeout }
     }
 
-    async fn post(&self, url: &str, body: &str, headers: &HashMap<String, String>) -> SdkResult<String> {
+    async fn post(
+        &self,
+        url: &str,
+        body: &str,
+        headers: &HashMap<String, String>,
+    ) -> SdkResult<String> {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         use tokio::net::TcpStream;
         use tokio::time::timeout;
@@ -177,7 +182,12 @@ impl HttpClient {
         let mut stream = timeout(self.timeout, connect_future)
             .await
             .map_err(|_| SdkError::timeout())?
-            .map_err(|e| SdkError::new(ErrorCode::ConnectionRefused, format!("Connection failed: {}", e)))?;
+            .map_err(|e| {
+                SdkError::new(
+                    ErrorCode::ConnectionRefused,
+                    format!("Connection failed: {}", e),
+                )
+            })?;
 
         // Build HTTP request
         let mut request = format!(
@@ -237,7 +247,10 @@ fn parse_url(url: &str) -> SdkResult<(String, u16, String)> {
 
     // Split host:port and path
     let (host_port, path) = if let Some(slash_pos) = without_protocol.find('/') {
-        (&without_protocol[..slash_pos], &without_protocol[slash_pos..])
+        (
+            &without_protocol[..slash_pos],
+            &without_protocol[slash_pos..],
+        )
     } else {
         (without_protocol, "/")
     };
@@ -246,9 +259,9 @@ fn parse_url(url: &str) -> SdkResult<(String, u16, String)> {
     let (host, port) = if let Some(colon_pos) = host_port.rfind(':') {
         let host = &host_port[..colon_pos];
         let port_str = &host_port[colon_pos + 1..];
-        let port = port_str
-            .parse()
-            .map_err(|_| SdkError::new(ErrorCode::InvalidUrl, format!("Invalid port: {}", port_str)))?;
+        let port = port_str.parse().map_err(|_| {
+            SdkError::new(ErrorCode::InvalidUrl, format!("Invalid port: {}", port_str))
+        })?;
         (host.to_string(), port)
     } else {
         (host_port.to_string(), 80)
@@ -270,7 +283,10 @@ fn parse_http_response(response: &str) -> SdkResult<String> {
     if !status_line.contains("200") && !status_line.contains("201") {
         // Check for other successful status codes
         if status_line.contains("4") || status_line.contains("5") {
-            return Err(SdkError::new(ErrorCode::HttpError, format!("HTTP error: {}", status_line)));
+            return Err(SdkError::new(
+                ErrorCode::HttpError,
+                format!("HTTP error: {}", status_line),
+            ));
         }
     }
 
@@ -286,7 +302,10 @@ fn parse_http_response(response: &str) -> SdkResult<String> {
         let body = &response[body_start + 2..];
         Ok(body.to_string())
     } else {
-        Err(SdkError::new(ErrorCode::InvalidResponse, "Could not find response body"))
+        Err(SdkError::new(
+            ErrorCode::InvalidResponse,
+            "Could not find response body",
+        ))
     }
 }
 
@@ -416,11 +435,14 @@ impl BgqlClient {
                 "variables": request.variables,
                 "operationName": request.operation_name,
             });
-            let body_str = serde_json::to_string(&body)
-                .map_err(|e| SdkError::serialize(e.to_string()))?;
+            let body_str =
+                serde_json::to_string(&body).map_err(|e| SdkError::serialize(e.to_string()))?;
 
             // Execute HTTP request
-            match http_client.post(&self.config.url, &body_str, &headers).await {
+            match http_client
+                .post(&self.config.url, &body_str, &headers)
+                .await
+            {
                 Ok(response_body) => {
                     // Parse JSON response
                     match serde_json::from_str::<Response>(&response_body) {
@@ -511,13 +533,17 @@ impl<T: DeserializeOwned> QueryBuilder<T> {
 
         if let Some(errors) = response.errors {
             if !errors.is_empty() {
-                return Err(SdkError::new(ErrorCode::ExecutionError, errors[0].message.clone()));
+                return Err(SdkError::new(
+                    ErrorCode::ExecutionError,
+                    errors[0].message.clone(),
+                ));
             }
         }
 
         match response.data {
-            Some(data) => serde_json::from_value(data)
-                .map_err(|e| SdkError::deserialize(e.to_string())),
+            Some(data) => {
+                serde_json::from_value(data).map_err(|e| SdkError::deserialize(e.to_string()))
+            }
             None => Err(SdkError::new(ErrorCode::NoData, "No data in response")),
         }
     }
@@ -585,7 +611,8 @@ impl BgqlClient {
 
         let response = self.execute_with_middleware(request).await?;
 
-        let errors: Vec<TypedGraphQLError> = response.errors
+        let errors: Vec<TypedGraphQLError> = response
+            .errors
             .unwrap_or_default()
             .into_iter()
             .map(|e| TypedGraphQLError {
@@ -654,7 +681,10 @@ impl<'a, Op: TypedOperation> TypedQueryBuilder<'a, Op> {
     }
 
     /// Executes with explicit variables (does not require Default).
-    pub async fn execute_with(self, variables: Op::Variables) -> SdkResult<TypedResponse<Op::Response>> {
+    pub async fn execute_with(
+        self,
+        variables: Op::Variables,
+    ) -> SdkResult<TypedResponse<Op::Response>> {
         self.client.execute_typed::<Op>(variables).await
     }
 }

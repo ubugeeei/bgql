@@ -155,8 +155,12 @@ where
 {
     fn from_context(ctx: &TypedContext) -> Self {
         (
-            ctx.get::<A>().cloned().unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<A>())),
-            ctx.get::<B>().cloned().unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<B>())),
+            ctx.get::<A>()
+                .cloned()
+                .unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<A>())),
+            ctx.get::<B>()
+                .cloned()
+                .unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<B>())),
         )
     }
 }
@@ -169,9 +173,15 @@ where
 {
     fn from_context(ctx: &TypedContext) -> Self {
         (
-            ctx.get::<A>().cloned().unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<A>())),
-            ctx.get::<B>().cloned().unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<B>())),
-            ctx.get::<C>().cloned().unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<C>())),
+            ctx.get::<A>()
+                .cloned()
+                .unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<A>())),
+            ctx.get::<B>()
+                .cloned()
+                .unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<B>())),
+            ctx.get::<C>()
+                .cloned()
+                .unwrap_or_else(|| panic!("Missing context type: {}", std::any::type_name::<C>())),
         )
     }
 }
@@ -267,28 +277,31 @@ impl<Schema> ResolverBuilder<Schema> {
 
             Box::pin(async move {
                 // Deserialize parent
-                let parent: Parent = serde_json::from_value(parent_json)
-                    .map_err(|e| SdkError::new(
+                let parent: Parent = serde_json::from_value(parent_json).map_err(|e| {
+                    SdkError::new(
                         ErrorCode::DeserializeError,
                         format!("Failed to deserialize parent: {}", e),
-                    ))?;
+                    )
+                })?;
 
                 // Deserialize args
-                let args: Args = serde_json::from_value(args_json)
-                    .map_err(|e| SdkError::new(
+                let args: Args = serde_json::from_value(args_json).map_err(|e| {
+                    SdkError::new(
                         ErrorCode::DeserializeError,
                         format!("Failed to deserialize arguments: {}", e),
-                    ))?;
+                    )
+                })?;
 
                 // Call resolver
                 let result = resolver(parent, args, ctx_data).await?;
 
                 // Serialize result
-                serde_json::to_value(result)
-                    .map_err(|e| SdkError::new(
+                serde_json::to_value(result).map_err(|e| {
+                    SdkError::new(
                         ErrorCode::SerializeError,
                         format!("Failed to serialize result: {}", e),
-                    ))
+                    )
+                })
             })
         });
 
@@ -400,12 +413,12 @@ impl<T> std::ops::Deref for TypedArgs<T> {
 impl<T: DeserializeOwned> TypedArgs<T> {
     /// Parses arguments from a JSON value.
     pub fn from_json(value: serde_json::Value) -> SdkResult<Self> {
-        serde_json::from_value(value)
-            .map(Self::new)
-            .map_err(|e| SdkError::new(
+        serde_json::from_value(value).map(Self::new).map_err(|e| {
+            SdkError::new(
                 ErrorCode::DeserializeError,
                 format!("Failed to parse arguments: {}", e),
-            ))
+            )
+        })
     }
 }
 
@@ -428,11 +441,12 @@ impl<T> TypedResult<T> {
 impl<T: Serialize> TypedResult<T> {
     /// Converts the result to JSON.
     pub fn to_json(&self) -> SdkResult<serde_json::Value> {
-        serde_json::to_value(&self.inner)
-            .map_err(|e| SdkError::new(
+        serde_json::to_value(&self.inner).map_err(|e| {
+            SdkError::new(
                 ErrorCode::SerializeError,
                 format!("Failed to serialize result: {}", e),
-            ))
+            )
+        })
     }
 }
 
@@ -462,10 +476,8 @@ impl<T> TypedResponse<T> {
             ));
         }
 
-        self.data.ok_or_else(|| SdkError::new(
-            ErrorCode::NoData,
-            "No data in response",
-        ))
+        self.data
+            .ok_or_else(|| SdkError::new(ErrorCode::NoData, "No data in response"))
     }
 }
 
@@ -521,13 +533,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_resolver_builder() {
-        let builder = ResolverBuilder::<()>::new()
-            .query::<GetUserArgs, (), User, _, _>("user", |args, _ctx| async move {
+        let builder = ResolverBuilder::<()>::new().query::<GetUserArgs, (), User, _, _>(
+            "user",
+            |args, _ctx| async move {
                 Ok(User {
                     id: args.id,
                     name: "Alice".to_string(),
                 })
-            });
+            },
+        );
 
         let resolvers = builder.build();
         assert_eq!(resolvers.len(), 1);

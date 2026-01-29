@@ -266,8 +266,8 @@ pub mod data {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::data::*;
+    use super::*;
 
     #[test]
     fn test_typed_context_basic() {

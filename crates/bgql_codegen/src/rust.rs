@@ -468,7 +468,8 @@ impl<'a> RustGenerator<'a> {
             "// =============================================================================\n\n",
         );
 
-        self.output.push_str("use bgql_sdk::server::{Context, SdkResult};\n");
+        self.output
+            .push_str("use bgql_sdk::server::{Context, SdkResult};\n");
         self.output.push_str("use std::sync::Arc;\n\n");
 
         // Generate argument types for each resolver
@@ -504,13 +505,12 @@ impl<'a> RustGenerator<'a> {
             let field_name = self.interner.get(field.name.value);
             let struct_name = to_pascal_case(&field_name) + "Args";
 
-            self.output.push_str(&format!(
-                "/// Arguments for `{}`.\n",
-                field_name
-            ));
+            self.output
+                .push_str(&format!("/// Arguments for `{}`.\n", field_name));
             self.output
                 .push_str("#[derive(Debug, Clone, Deserialize)]\n");
-            self.output.push_str(&format!("pub struct {} {{\n", struct_name));
+            self.output
+                .push_str(&format!("pub struct {} {{\n", struct_name));
 
             for arg in &field.arguments {
                 let arg_name = self.interner.get(arg.name.value);
@@ -524,8 +524,7 @@ impl<'a> RustGenerator<'a> {
 
                 // Skip serializing None values
                 if matches!(&arg.ty, Type::Option(_, _)) {
-                    self.output
-                        .push_str("    #[serde(default)]\n");
+                    self.output.push_str("    #[serde(default)]\n");
                 }
 
                 self.output
@@ -544,9 +543,13 @@ impl<'a> RustGenerator<'a> {
         self.output
             .push_str(&format!("/// {} resolvers trait.\n", type_name));
         self.output.push_str("///\n");
-        self.output.push_str("/// Implement this trait to define your resolvers.\n");
+        self.output
+            .push_str("/// Implement this trait to define your resolvers.\n");
         self.output.push_str("/// ```ignore\n");
-        self.output.push_str(&format!("/// impl {}Resolvers for MyResolvers {{\n", type_name));
+        self.output.push_str(&format!(
+            "/// impl {}Resolvers for MyResolvers {{\n",
+            type_name
+        ));
         self.output.push_str("///     // ...\n");
         self.output.push_str("/// }}\n");
         self.output.push_str("/// ```\n");
@@ -578,16 +581,26 @@ impl<'a> RustGenerator<'a> {
     }
 
     fn write_server_builder_ext(&mut self) {
-        self.output.push_str("/// Extension trait for type-safe resolver registration.\n");
+        self.output
+            .push_str("/// Extension trait for type-safe resolver registration.\n");
         self.output.push_str("pub trait ServerBuilderExt {\n");
-        self.output.push_str("    /// Register Query resolvers from a trait implementation.\n");
-        self.output.push_str("    fn query_resolvers(self, resolvers: Arc<dyn QueryResolvers>) -> Self;\n");
-        self.output.push_str("    /// Register Mutation resolvers from a trait implementation.\n");
-        self.output.push_str("    fn mutation_resolvers(self, resolvers: Arc<dyn MutationResolvers>) -> Self;\n");
+        self.output
+            .push_str("    /// Register Query resolvers from a trait implementation.\n");
+        self.output.push_str(
+            "    fn query_resolvers(self, resolvers: Arc<dyn QueryResolvers>) -> Self;\n",
+        );
+        self.output
+            .push_str("    /// Register Mutation resolvers from a trait implementation.\n");
+        self.output.push_str(
+            "    fn mutation_resolvers(self, resolvers: Arc<dyn MutationResolvers>) -> Self;\n",
+        );
         self.output.push_str("}\n\n");
 
-        self.output.push_str("impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {\n");
-        self.output.push_str("    fn query_resolvers(mut self, resolvers: Arc<dyn QueryResolvers>) -> Self {\n");
+        self.output
+            .push_str("impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {\n");
+        self.output.push_str(
+            "    fn query_resolvers(mut self, resolvers: Arc<dyn QueryResolvers>) -> Self {\n",
+        );
 
         // Find Query type and register each resolver
         for type_def in extract_types(self.document) {

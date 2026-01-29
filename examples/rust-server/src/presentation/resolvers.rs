@@ -76,10 +76,13 @@ impl QueryResolvers for AppQueryResolvers {
     }
 
     async fn users(&self, _ctx: &Context, args: UsersArgs) -> SdkResult<serde_json::Value> {
-        let pagination = args.pagination.map(|p| crate::domain::Pagination {
-            first: p.first.map(|n| n as usize),
-            after: p.after,
-        }).unwrap_or_default();
+        let pagination = args
+            .pagination
+            .map(|p| crate::domain::Pagination {
+                first: p.first.map(|n| n as usize),
+                after: p.after,
+            })
+            .unwrap_or_default();
 
         let conn = self.ctx.user_service.list_users(pagination).await;
 
@@ -139,18 +142,30 @@ impl QueryResolvers for AppQueryResolvers {
     }
 
     async fn posts(&self, _ctx: &Context, args: PostsArgs) -> SdkResult<serde_json::Value> {
-        let pagination = args.pagination.map(|p| crate::domain::Pagination {
-            first: p.first.map(|n| n as usize),
-            after: p.after,
-        }).unwrap_or_default();
+        let pagination = args
+            .pagination
+            .map(|p| crate::domain::Pagination {
+                first: p.first.map(|n| n as usize),
+                after: p.after,
+            })
+            .unwrap_or_default();
 
-        let filter = args.filter.map(|f| crate::domain::PostFilter {
-            status: f.status.and_then(|s| crate::domain::PostStatus::from_str(&s.to_string())),
-            author_id: f.author_id.map(|id| crate::domain::UserId::new(&id.0)),
-        }).unwrap_or_default();
+        let filter = args
+            .filter
+            .map(|f| crate::domain::PostFilter {
+                status: f
+                    .status
+                    .and_then(|s| crate::domain::PostStatus::from_str(&s.to_string())),
+                author_id: f.author_id.map(|id| crate::domain::UserId::new(&id.0)),
+            })
+            .unwrap_or_default();
 
         let conn = self.ctx.post_service.list_posts(filter, pagination).await;
-        let author_ids: Vec<_> = conn.edges.iter().map(|e| e.node.author_id.clone()).collect();
+        let author_ids: Vec<_> = conn
+            .edges
+            .iter()
+            .map(|e| e.node.author_id.clone())
+            .collect();
         let authors = self.ctx.user_service.get_users_by_ids(&author_ids).await;
 
         Ok(json!({
@@ -193,12 +208,19 @@ impl AppMutationResolvers {
 
 #[async_trait]
 impl MutationResolvers for AppMutationResolvers {
-    async fn create_post(&self, _ctx: &Context, args: CreatePostArgs) -> SdkResult<serde_json::Value> {
+    async fn create_post(
+        &self,
+        _ctx: &Context,
+        args: CreatePostArgs,
+    ) -> SdkResult<serde_json::Value> {
         let input = crate::application::CreatePostInput {
             author_id: crate::domain::UserId::new("user_1"), // TODO: from auth context
             title: args.input.title,
             content: args.input.content,
-            status: args.input.status.and_then(|s| crate::domain::PostStatus::from_str(&s.to_string())),
+            status: args
+                .input
+                .status
+                .and_then(|s| crate::domain::PostStatus::from_str(&s.to_string())),
         };
 
         match self.ctx.post_service.create_post(input).await {
@@ -224,12 +246,19 @@ impl MutationResolvers for AppMutationResolvers {
         }
     }
 
-    async fn update_post(&self, _ctx: &Context, args: UpdatePostArgs) -> SdkResult<serde_json::Value> {
+    async fn update_post(
+        &self,
+        _ctx: &Context,
+        args: UpdatePostArgs,
+    ) -> SdkResult<serde_json::Value> {
         let id = crate::domain::PostId::new(&args.id.0);
         let input = crate::application::UpdatePostInput {
             title: args.input.title,
             content: args.input.content,
-            status: args.input.status.and_then(|s| crate::domain::PostStatus::from_str(&s.to_string())),
+            status: args
+                .input
+                .status
+                .and_then(|s| crate::domain::PostStatus::from_str(&s.to_string())),
         };
 
         match self.ctx.post_service.update_post(&id, input).await {
@@ -256,7 +285,11 @@ impl MutationResolvers for AppMutationResolvers {
         }
     }
 
-    async fn publish_post(&self, _ctx: &Context, args: PublishPostArgs) -> SdkResult<serde_json::Value> {
+    async fn publish_post(
+        &self,
+        _ctx: &Context,
+        args: PublishPostArgs,
+    ) -> SdkResult<serde_json::Value> {
         let id = crate::domain::PostId::new(&args.id.0);
 
         match self.ctx.post_service.publish_post(&id).await {
@@ -278,7 +311,11 @@ impl MutationResolvers for AppMutationResolvers {
         }
     }
 
-    async fn delete_post(&self, _ctx: &Context, args: DeletePostArgs) -> SdkResult<serde_json::Value> {
+    async fn delete_post(
+        &self,
+        _ctx: &Context,
+        args: DeletePostArgs,
+    ) -> SdkResult<serde_json::Value> {
         let id = crate::domain::PostId::new(&args.id.0);
 
         match self.ctx.post_service.delete_post(&id).await {
@@ -299,7 +336,11 @@ impl MutationResolvers for AppMutationResolvers {
         }
     }
 
-    async fn create_comment(&self, _ctx: &Context, args: CreateCommentArgs) -> SdkResult<serde_json::Value> {
+    async fn create_comment(
+        &self,
+        _ctx: &Context,
+        args: CreateCommentArgs,
+    ) -> SdkResult<serde_json::Value> {
         let input = crate::application::CreateCommentInput {
             post_id: crate::domain::PostId::new(&args.input.post_id.0),
             author_id: crate::domain::UserId::new("user_1"), // TODO: from auth context

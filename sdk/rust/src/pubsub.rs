@@ -48,7 +48,10 @@ impl PubSub {
         }
     }
 
-    pub async fn subscribe(&self, topic: impl Into<String>) -> broadcast::Receiver<serde_json::Value> {
+    pub async fn subscribe(
+        &self,
+        topic: impl Into<String>,
+    ) -> broadcast::Receiver<serde_json::Value> {
         let topic = topic.into();
         let mut channels = self.channels.write().await;
 

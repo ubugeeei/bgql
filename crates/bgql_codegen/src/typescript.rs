@@ -1,17 +1,11 @@
 //! TypeScript code generator.
 
-<<<<<<< HEAD
-use crate::{extract_types, CodegenOptions, TypeConverter};
-use bgql_core::Interner;
-use bgql_syntax::{Document, FieldDefinition, InputValueDefinition, Type, TypeDefinition};
-=======
 use crate::{extract_operations, extract_types, CodegenOptions, TypeConverter};
 use bgql_core::Interner;
 use bgql_syntax::{
-    Directive, Document, FieldDefinition, InputValueDefinition, OperationDefinition,
-    OperationType, Selection, Type, TypeDefinition,
+    Directive, Document, FieldDefinition, InputValueDefinition, OperationDefinition, OperationType,
+    Selection, Type, TypeDefinition,
 };
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
 /// TypeScript code generator.
 pub struct TypeScriptGenerator<'a> {
@@ -38,11 +32,6 @@ impl<'a> TypeScriptGenerator<'a> {
     pub fn generate(mut self) -> String {
         self.write_header();
         self.write_imports();
-<<<<<<< HEAD
-        self.write_scalars();
-        self.write_types();
-
-=======
         self.write_utility_types();
         self.write_typed_document_node();
         self.write_scalars();
@@ -52,7 +41,6 @@ impl<'a> TypeScriptGenerator<'a> {
             self.write_operations();
         }
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         if self.options.client {
             self.write_client_sdk();
         }
@@ -90,8 +78,6 @@ impl<'a> TypeScriptGenerator<'a> {
         }
     }
 
-<<<<<<< HEAD
-=======
     fn write_utility_types(&mut self) {
         self.output.push_str(
             "// =============================================================================\n",
@@ -102,19 +88,23 @@ impl<'a> TypeScriptGenerator<'a> {
         );
 
         // Re-export built-in utility types for convenience
-        self.output.push_str("/** Makes all properties in T optional */\n");
+        self.output
+            .push_str("/** Makes all properties in T optional */\n");
         self.output
             .push_str("export type BgqlPartial<T> = Partial<T>;\n\n");
 
-        self.output.push_str("/** Makes all properties in T required */\n");
+        self.output
+            .push_str("/** Makes all properties in T required */\n");
         self.output
             .push_str("export type BgqlRequired<T> = Required<T>;\n\n");
 
-        self.output.push_str("/** From T, pick a set of properties whose keys are in K */\n");
+        self.output
+            .push_str("/** From T, pick a set of properties whose keys are in K */\n");
         self.output
             .push_str("export type BgqlPick<T, K extends keyof T> = Pick<T, K>;\n\n");
 
-        self.output.push_str("/** Construct a type with properties of T except for those in K */\n");
+        self.output
+            .push_str("/** Construct a type with properties of T except for those in K */\n");
         self.output
             .push_str("export type BgqlOmit<T, K extends keyof T> = Omit<T, K>;\n\n");
 
@@ -123,9 +113,8 @@ impl<'a> TypeScriptGenerator<'a> {
             .push_str("/** Helper for exhaustiveness checking in switch statements */\n");
         self.output
             .push_str("export function assertNever(value: never): never {\n");
-        self.output.push_str(
-            "  throw new Error(`Unexpected value: ${JSON.stringify(value)}`);\n",
-        );
+        self.output
+            .push_str("  throw new Error(`Unexpected value: ${JSON.stringify(value)}`);\n");
         self.output.push_str("}\n\n");
 
         // Exact type helper (prevents excess properties)
@@ -136,8 +125,7 @@ impl<'a> TypeScriptGenerator<'a> {
         );
 
         // DeepReadonly type helper
-        self.output
-            .push_str("/** Deep readonly type helper */\n");
+        self.output.push_str("/** Deep readonly type helper */\n");
         self.output.push_str(
             "export type DeepReadonly<T> = T extends (infer U)[] ? ReadonlyArray<DeepReadonly<U>> : T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T;\n\n",
         );
@@ -173,7 +161,8 @@ impl<'a> TypeScriptGenerator<'a> {
         self.output.push_str("}\n\n");
 
         // DefinitionNode type
-        self.output.push_str("/** Represents a definition in a GraphQL document */\n");
+        self.output
+            .push_str("/** Represents a definition in a GraphQL document */\n");
         self.output.push_str("export interface DefinitionNode {\n");
         self.output.push_str("  readonly kind: string;\n");
         self.output.push_str("}\n\n");
@@ -187,7 +176,8 @@ impl<'a> TypeScriptGenerator<'a> {
             .push_str("  readonly kind: 'OperationDefinition';\n");
         self.output
             .push_str("  readonly operation: 'query' | 'mutation' | 'subscription';\n");
-        self.output.push_str("  readonly name?: { readonly kind: 'Name'; readonly value: string };\n");
+        self.output
+            .push_str("  readonly name?: { readonly kind: 'Name'; readonly value: string };\n");
         self.output
             .push_str("  readonly variableDefinitions?: ReadonlyArray<VariableDefinitionNode>;\n");
         self.output
@@ -197,7 +187,8 @@ impl<'a> TypeScriptGenerator<'a> {
         // VariableDefinitionNode type
         self.output
             .push_str("/** Represents a variable definition in an operation */\n");
-        self.output.push_str("export interface VariableDefinitionNode {\n");
+        self.output
+            .push_str("export interface VariableDefinitionNode {\n");
         self.output
             .push_str("  readonly kind: 'VariableDefinition';\n");
         self.output
@@ -206,10 +197,10 @@ impl<'a> TypeScriptGenerator<'a> {
         self.output.push_str("}\n\n");
 
         // TypeNode type
-        self.output.push_str("/** Represents a type reference in GraphQL */\n");
-        self.output.push_str(
-            "export type TypeNode = NamedTypeNode | ListTypeNode | NonNullTypeNode;\n\n",
-        );
+        self.output
+            .push_str("/** Represents a type reference in GraphQL */\n");
+        self.output
+            .push_str("export type TypeNode = NamedTypeNode | ListTypeNode | NonNullTypeNode;\n\n");
 
         self.output.push_str("export interface NamedTypeNode {\n");
         self.output.push_str("  readonly kind: 'NamedType';\n");
@@ -231,37 +222,46 @@ impl<'a> TypeScriptGenerator<'a> {
         // SelectionSetNode type
         self.output
             .push_str("/** Represents a selection set in a GraphQL operation */\n");
-        self.output.push_str("export interface SelectionSetNode {\n");
+        self.output
+            .push_str("export interface SelectionSetNode {\n");
         self.output.push_str("  readonly kind: 'SelectionSet';\n");
         self.output
             .push_str("  readonly selections: ReadonlyArray<SelectionNode>;\n");
         self.output.push_str("}\n\n");
 
         // SelectionNode type
-        self.output.push_str("/** Represents a selection in a selection set */\n");
+        self.output
+            .push_str("/** Represents a selection in a selection set */\n");
         self.output.push_str(
             "export type SelectionNode = FieldNode | FragmentSpreadNode | InlineFragmentNode;\n\n",
         );
 
         self.output.push_str("export interface FieldNode {\n");
         self.output.push_str("  readonly kind: 'Field';\n");
-        self.output.push_str("  readonly alias?: { readonly kind: 'Name'; readonly value: string };\n");
+        self.output
+            .push_str("  readonly alias?: { readonly kind: 'Name'; readonly value: string };\n");
         self.output
             .push_str("  readonly name: { readonly kind: 'Name'; readonly value: string };\n");
-        self.output.push_str("  readonly arguments?: ReadonlyArray<ArgumentNode>;\n");
-        self.output.push_str("  readonly selectionSet?: SelectionSetNode;\n");
+        self.output
+            .push_str("  readonly arguments?: ReadonlyArray<ArgumentNode>;\n");
+        self.output
+            .push_str("  readonly selectionSet?: SelectionSetNode;\n");
         self.output.push_str("}\n\n");
 
-        self.output.push_str("export interface FragmentSpreadNode {\n");
+        self.output
+            .push_str("export interface FragmentSpreadNode {\n");
         self.output.push_str("  readonly kind: 'FragmentSpread';\n");
         self.output
             .push_str("  readonly name: { readonly kind: 'Name'; readonly value: string };\n");
         self.output.push_str("}\n\n");
 
-        self.output.push_str("export interface InlineFragmentNode {\n");
+        self.output
+            .push_str("export interface InlineFragmentNode {\n");
         self.output.push_str("  readonly kind: 'InlineFragment';\n");
-        self.output.push_str("  readonly typeCondition?: NamedTypeNode;\n");
-        self.output.push_str("  readonly selectionSet: SelectionSetNode;\n");
+        self.output
+            .push_str("  readonly typeCondition?: NamedTypeNode;\n");
+        self.output
+            .push_str("  readonly selectionSet: SelectionSetNode;\n");
         self.output.push_str("}\n\n");
 
         self.output.push_str("export interface ArgumentNode {\n");
@@ -271,15 +271,21 @@ impl<'a> TypeScriptGenerator<'a> {
         self.output.push_str("  readonly value: ValueNode;\n");
         self.output.push_str("}\n\n");
 
-        self.output.push_str("/** Represents a value in GraphQL */\n");
+        self.output
+            .push_str("/** Represents a value in GraphQL */\n");
         self.output.push_str("export type ValueNode =\n");
         self.output.push_str("  | { readonly kind: 'Variable'; readonly name: { readonly kind: 'Name'; readonly value: string } }\n");
-        self.output.push_str("  | { readonly kind: 'IntValue'; readonly value: string }\n");
-        self.output.push_str("  | { readonly kind: 'FloatValue'; readonly value: string }\n");
-        self.output.push_str("  | { readonly kind: 'StringValue'; readonly value: string }\n");
-        self.output.push_str("  | { readonly kind: 'BooleanValue'; readonly value: boolean }\n");
+        self.output
+            .push_str("  | { readonly kind: 'IntValue'; readonly value: string }\n");
+        self.output
+            .push_str("  | { readonly kind: 'FloatValue'; readonly value: string }\n");
+        self.output
+            .push_str("  | { readonly kind: 'StringValue'; readonly value: string }\n");
+        self.output
+            .push_str("  | { readonly kind: 'BooleanValue'; readonly value: boolean }\n");
         self.output.push_str("  | { readonly kind: 'NullValue' }\n");
-        self.output.push_str("  | { readonly kind: 'EnumValue'; readonly value: string }\n");
+        self.output
+            .push_str("  | { readonly kind: 'EnumValue'; readonly value: string }\n");
         self.output.push_str(
             "  | { readonly kind: 'ListValue'; readonly values: ReadonlyArray<ValueNode> }\n",
         );
@@ -297,43 +303,45 @@ impl<'a> TypeScriptGenerator<'a> {
         );
         self.output
             .push_str("  readonly __apiType?: (variables: TVariables) => TData;\n");
-        self.output.push_str("  /** Additional type brand for stricter type checking */\n");
         self.output
-            .push_str("  readonly __resultType?: TData;\n");
+            .push_str("  /** Additional type brand for stricter type checking */\n");
+        self.output.push_str("  readonly __resultType?: TData;\n");
         self.output
             .push_str("  readonly __variablesType?: TVariables;\n");
         self.output.push_str("}\n\n");
 
         // Helper types for extracting Data and Variables from TypedDocumentNode
-        self.output.push_str("/** Extract the data type from a TypedDocumentNode */\n");
+        self.output
+            .push_str("/** Extract the data type from a TypedDocumentNode */\n");
         self.output.push_str(
             "export type ResultOf<T> = T extends TypedDocumentNode<infer Data, any> ? Data : never;\n\n",
         );
 
-        self.output.push_str("/** Extract the variables type from a TypedDocumentNode */\n");
+        self.output
+            .push_str("/** Extract the variables type from a TypedDocumentNode */\n");
         self.output.push_str(
             "export type VariablesOf<T> = T extends TypedDocumentNode<any, infer Vars> ? Vars : never;\n\n",
         );
 
         // Helper for making document nodes
-        self.output.push_str("/** Helper type to create a typed document from raw string */\n");
+        self.output
+            .push_str("/** Helper type to create a typed document from raw string */\n");
         self.output.push_str(
             "export type TypedDocumentString<TData, TVariables> = string & TypedDocumentNode<TData, TVariables>;\n\n",
         );
 
         // Fragment mask helpers for fragment type safety
-        self.output.push_str("/** Fragment reference type for masked fragments */\n");
-        self.output.push_str(
-            "export type FragmentType<T> = { readonly ' $fragmentRefs'?: T };\n\n",
-        );
+        self.output
+            .push_str("/** Fragment reference type for masked fragments */\n");
+        self.output
+            .push_str("export type FragmentType<T> = { readonly ' $fragmentRefs'?: T };\n\n");
 
-        self.output.push_str("/** Helper to unmask fragment data */\n");
-        self.output.push_str(
-            "export type Unmasked<T> = T extends FragmentType<infer U> ? U : T;\n\n",
-        );
+        self.output
+            .push_str("/** Helper to unmask fragment data */\n");
+        self.output
+            .push_str("export type Unmasked<T> = T extends FragmentType<infer U> ? U : T;\n\n");
     }
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     fn write_scalars(&mut self) {
         self.output.push_str(
             "// =============================================================================\n",
@@ -348,12 +356,9 @@ impl<'a> TypeScriptGenerator<'a> {
         self.output.push_str("export type Boolean = boolean;\n");
         self.output.push_str("export type String = string;\n");
         self.output.push_str("export type DateTime = string;\n");
-<<<<<<< HEAD
-=======
         self.output.push_str("export type Date = string;\n");
         self.output.push_str("export type Uint = number;\n");
         self.output.push_str("export type Void = void;\n");
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         self.output
             .push_str("export type JSON = Record<string, unknown>;\n\n");
     }
@@ -386,20 +391,18 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_object_type(&mut self, obj: &bgql_syntax::ObjectTypeDefinition<'_>) {
         let name = self.interner.get(obj.name.value);
 
-<<<<<<< HEAD
-        // Write description if present
-        if let Some(desc) = &obj.description {
-            self.write_jsdoc(desc.value);
-=======
         // Check for @deprecated directive
         let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&obj.directives);
 
         // Write description if present
         if let Some(desc) = &obj.description {
-            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+            self.write_jsdoc_with_deprecated(
+                desc.value,
+                is_deprecated,
+                deprecation_reason.as_deref(),
+            );
         } else if is_deprecated {
             self.write_deprecated_jsdoc(deprecation_reason.as_deref());
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         // Write interface
@@ -433,18 +436,17 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_interface_type(&mut self, iface: &bgql_syntax::InterfaceTypeDefinition<'_>) {
         let name = self.interner.get(iface.name.value);
 
-<<<<<<< HEAD
-        if let Some(desc) = &iface.description {
-            self.write_jsdoc(desc.value);
-=======
         // Check for @deprecated directive
         let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&iface.directives);
 
         if let Some(desc) = &iface.description {
-            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+            self.write_jsdoc_with_deprecated(
+                desc.value,
+                is_deprecated,
+                deprecation_reason.as_deref(),
+            );
         } else if is_deprecated {
             self.write_deprecated_jsdoc(deprecation_reason.as_deref());
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         self.output
@@ -460,18 +462,17 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_enum_type(&mut self, e: &bgql_syntax::EnumTypeDefinition<'_>) {
         let name = self.interner.get(e.name.value);
 
-<<<<<<< HEAD
-        if let Some(desc) = &e.description {
-            self.write_jsdoc(desc.value);
-=======
         // Check for @deprecated directive
         let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&e.directives);
 
         if let Some(desc) = &e.description {
-            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+            self.write_jsdoc_with_deprecated(
+                desc.value,
+                is_deprecated,
+                deprecation_reason.as_deref(),
+            );
         } else if is_deprecated {
             self.write_deprecated_jsdoc(deprecation_reason.as_deref());
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         // Check if any values have data (Rust-style enum)
@@ -481,28 +482,6 @@ impl<'a> TypeScriptGenerator<'a> {
             // Generate discriminated union for Rust-style enums
             self.write_rust_style_enum(e);
         } else {
-<<<<<<< HEAD
-            // Simple string union
-            let values: Vec<_> = e
-                .values
-                .iter()
-                .map(|v| format!("'{}'", self.interner.get(v.name.value)))
-                .collect();
-            self.output.push_str(&format!(
-                "export type {} = {};\n\n",
-                name,
-                values.join(" | ")
-            ));
-
-            // Also generate const object for runtime use
-            self.output
-                .push_str(&format!("export const {} = {{\n", name));
-            for value in &e.values {
-                let val = self.interner.get(value.name.value);
-                self.output.push_str(&format!("  {}: '{}',\n", val, val));
-            }
-            self.output.push_str("} as const;\n\n");
-=======
             // Generate const object first for exact type inference
             self.output
                 .push_str(&format!("/** Enum values for {} */\n", name));
@@ -511,10 +490,12 @@ impl<'a> TypeScriptGenerator<'a> {
             for value in &e.values {
                 let val = self.interner.get(value.name.value);
                 // Check for @deprecated directive on enum value
-                let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&value.directives);
+                let (is_deprecated, deprecation_reason) =
+                    self.get_deprecation_info(&value.directives);
                 if is_deprecated {
                     if let Some(reason) = &deprecation_reason {
-                        self.output.push_str(&format!("  /** @deprecated {} */\n", reason));
+                        self.output
+                            .push_str(&format!("  /** @deprecated {} */\n", reason));
                     } else {
                         self.output.push_str("  /** @deprecated */\n");
                     }
@@ -534,10 +515,8 @@ impl<'a> TypeScriptGenerator<'a> {
             ));
 
             // Generate type guard
-            self.output.push_str(&format!(
-                "/** Type guard for {} */\n",
-                name
-            ));
+            self.output
+                .push_str(&format!("/** Type guard for {} */\n", name));
             self.output.push_str(&format!(
                 "export function is{}(value: unknown): value is {} {{\n",
                 name, name
@@ -547,7 +526,6 @@ impl<'a> TypeScriptGenerator<'a> {
                 name, name
             ));
             self.output.push_str("}\n\n");
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
     }
 
@@ -631,69 +609,58 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_union_type(&mut self, u: &bgql_syntax::UnionTypeDefinition<'_>) {
         let name = self.interner.get(u.name.value);
 
-<<<<<<< HEAD
-        if let Some(desc) = &u.description {
-            self.write_jsdoc(desc.value);
-=======
         // Check for @deprecated directive
         let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&u.directives);
 
         if let Some(desc) = &u.description {
-            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+            self.write_jsdoc_with_deprecated(
+                desc.value,
+                is_deprecated,
+                deprecation_reason.as_deref(),
+            );
         } else if is_deprecated {
             self.write_deprecated_jsdoc(deprecation_reason.as_deref());
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         let members: Vec<_> = u
             .members
             .iter()
-<<<<<<< HEAD
-            .map(|m| self.interner.get(m.value))
-=======
             .map(|m| self.interner.get(m.value).to_string())
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
             .collect();
         self.output.push_str(&format!(
             "export type {} = {};\n\n",
             name,
             members.join(" | ")
         ));
-<<<<<<< HEAD
-=======
 
         // Generate type guards for discriminated unions
         self.output
             .push_str(&format!("export const {} = {{\n", name));
         for member in &members {
-            self.output.push_str(&format!(
-                "  /** Type guard for {} */\n",
-                member
-            ));
+            self.output
+                .push_str(&format!("  /** Type guard for {} */\n", member));
             self.output.push_str(&format!(
                 "  is{}: (value: {}): value is {} => value.__typename === '{}',\n",
                 member, name, member, member
             ));
         }
         self.output.push_str("} as const;\n\n");
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     }
 
     fn write_input_type(&mut self, inp: &bgql_syntax::InputObjectTypeDefinition<'_>) {
         let name = self.interner.get(inp.name.value);
 
-<<<<<<< HEAD
-        if let Some(desc) = &inp.description {
-            self.write_jsdoc(desc.value);
-=======
         // Check for @deprecated directive
         let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&inp.directives);
 
         if let Some(desc) = &inp.description {
-            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+            self.write_jsdoc_with_deprecated(
+                desc.value,
+                is_deprecated,
+                deprecation_reason.as_deref(),
+            );
         } else if is_deprecated {
             self.write_deprecated_jsdoc(deprecation_reason.as_deref());
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         self.output
@@ -709,18 +676,17 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_scalar_type(&mut self, s: &bgql_syntax::ScalarTypeDefinition<'_>) {
         let name = self.interner.get(s.name.value);
 
-<<<<<<< HEAD
-        if let Some(desc) = &s.description {
-            self.write_jsdoc(desc.value);
-=======
         // Check for @deprecated directive
         let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&s.directives);
 
         if let Some(desc) = &s.description {
-            self.write_jsdoc_with_deprecated(desc.value, is_deprecated, deprecation_reason.as_deref());
+            self.write_jsdoc_with_deprecated(
+                desc.value,
+                is_deprecated,
+                deprecation_reason.as_deref(),
+            );
         } else if is_deprecated {
             self.write_deprecated_jsdoc(deprecation_reason.as_deref());
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         // Custom scalars map to unknown by default
@@ -838,10 +804,6 @@ impl<'a> TypeScriptGenerator<'a> {
         let ts_type = self.convert_type(&field.ty, self.interner);
         let optional = self.is_optional(&field.ty);
 
-<<<<<<< HEAD
-        if let Some(desc) = &field.description {
-            self.output.push_str(&format!("  /** {} */\n", desc.value));
-=======
         // Check for @deprecated directive
         let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&field.directives);
 
@@ -850,7 +812,8 @@ impl<'a> TypeScriptGenerator<'a> {
                 self.output.push_str("  /**\n");
                 self.output.push_str(&format!("   * {}\n", desc.value));
                 if let Some(reason) = &deprecation_reason {
-                    self.output.push_str(&format!("   * @deprecated {}\n", reason));
+                    self.output
+                        .push_str(&format!("   * @deprecated {}\n", reason));
                 } else {
                     self.output.push_str("   * @deprecated\n");
                 }
@@ -861,12 +824,12 @@ impl<'a> TypeScriptGenerator<'a> {
         } else if is_deprecated {
             self.output.push_str("  /**\n");
             if let Some(reason) = &deprecation_reason {
-                self.output.push_str(&format!("   * @deprecated {}\n", reason));
+                self.output
+                    .push_str(&format!("   * @deprecated {}\n", reason));
             } else {
                 self.output.push_str("   * @deprecated\n");
             }
             self.output.push_str("   */\n");
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         self.output.push_str(&format!(
@@ -882,10 +845,6 @@ impl<'a> TypeScriptGenerator<'a> {
         let ts_type = self.convert_type(&field.ty, self.interner);
         let optional = self.is_optional(&field.ty) || field.default_value.is_some();
 
-<<<<<<< HEAD
-        if let Some(desc) = &field.description {
-            self.output.push_str(&format!("  /** {} */\n", desc.value));
-=======
         // Check for @deprecated directive
         let (is_deprecated, deprecation_reason) = self.get_deprecation_info(&field.directives);
 
@@ -894,7 +853,8 @@ impl<'a> TypeScriptGenerator<'a> {
                 self.output.push_str("  /**\n");
                 self.output.push_str(&format!("   * {}\n", desc.value));
                 if let Some(reason) = &deprecation_reason {
-                    self.output.push_str(&format!("   * @deprecated {}\n", reason));
+                    self.output
+                        .push_str(&format!("   * @deprecated {}\n", reason));
                 } else {
                     self.output.push_str("   * @deprecated\n");
                 }
@@ -905,12 +865,12 @@ impl<'a> TypeScriptGenerator<'a> {
         } else if is_deprecated {
             self.output.push_str("  /**\n");
             if let Some(reason) = &deprecation_reason {
-                self.output.push_str(&format!("   * @deprecated {}\n", reason));
+                self.output
+                    .push_str(&format!("   * @deprecated {}\n", reason));
             } else {
                 self.output.push_str("   * @deprecated\n");
             }
             self.output.push_str("   */\n");
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
 
         self.output.push_str(&format!(
@@ -921,8 +881,6 @@ impl<'a> TypeScriptGenerator<'a> {
         ));
     }
 
-<<<<<<< HEAD
-=======
     fn write_operations(&mut self) {
         let operations = extract_operations(self.document);
         if operations.is_empty() {
@@ -932,7 +890,8 @@ impl<'a> TypeScriptGenerator<'a> {
         self.output.push_str(
             "// =============================================================================\n",
         );
-        self.output.push_str("// Operation Types and Typed Documents\n");
+        self.output
+            .push_str("// Operation Types and Typed Documents\n");
         self.output.push_str(
             "// =============================================================================\n\n",
         );
@@ -965,7 +924,12 @@ impl<'a> TypeScriptGenerator<'a> {
         self.write_operation_data_type(&data_type_name, operation);
 
         // Generate the TypedDocumentNode constant
-        self.write_typed_document_const(&document_name, &data_type_name, &variables_type_name, operation);
+        self.write_typed_document_const(
+            &document_name,
+            &data_type_name,
+            &variables_type_name,
+            operation,
+        );
     }
 
     fn write_operation_variables_type(
@@ -978,13 +942,17 @@ impl<'a> TypeScriptGenerator<'a> {
                 "/** Variables for {} - no variables required */\n",
                 type_name
             ));
-            self.output
-                .push_str(&format!("export type {} = Record<string, never>;\n\n", type_name));
+            self.output.push_str(&format!(
+                "export type {} = Record<string, never>;\n\n",
+                type_name
+            ));
             return;
         }
 
-        self.output.push_str("/** Variables type for operation */\n");
-        self.output.push_str(&format!("export interface {} {{\n", type_name));
+        self.output
+            .push_str("/** Variables type for operation */\n");
+        self.output
+            .push_str(&format!("export interface {} {{\n", type_name));
 
         for var in variables {
             let var_name = self.interner.get(var.name.value);
@@ -1002,13 +970,11 @@ impl<'a> TypeScriptGenerator<'a> {
         self.output.push_str("}\n\n");
     }
 
-    fn write_operation_data_type(
-        &mut self,
-        type_name: &str,
-        operation: &OperationDefinition<'_>,
-    ) {
-        self.output.push_str("/** Result data type for operation */\n");
-        self.output.push_str(&format!("export interface {} {{\n", type_name));
+    fn write_operation_data_type(&mut self, type_name: &str, operation: &OperationDefinition<'_>) {
+        self.output
+            .push_str("/** Result data type for operation */\n");
+        self.output
+            .push_str(&format!("export interface {} {{\n", type_name));
 
         // Generate fields from selection set
         for selection in &operation.selection_set.selections {
@@ -1031,15 +997,12 @@ impl<'a> TypeScriptGenerator<'a> {
                 // For now, generate as unknown type - in a real implementation,
                 // you would resolve this against the schema
                 if let Some(ref selection_set) = field.selection_set {
-                    self.output.push_str(&format!(
-                        "{}readonly {}: {{\n",
-                        indent_str, field_name
-                    ));
+                    self.output
+                        .push_str(&format!("{}readonly {}: {{\n", indent_str, field_name));
                     for sub_selection in &selection_set.selections {
                         self.write_selection_field(sub_selection, indent + 1);
                     }
-                    self.output
-                        .push_str(&format!("{}}};\n", indent_str));
+                    self.output.push_str(&format!("{}}};\n", indent_str));
                 } else {
                     // Scalar field - type would be resolved from schema in full implementation
                     self.output.push_str(&format!(
@@ -1129,7 +1092,8 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_variable_definition_node(&mut self, var: &bgql_syntax::VariableDefinition<'_>) {
         let var_name = self.interner.get(var.name.value);
         self.output.push_str("        {\n");
-        self.output.push_str("          kind: 'VariableDefinition',\n");
+        self.output
+            .push_str("          kind: 'VariableDefinition',\n");
         self.output.push_str(&format!(
             "          variable: {{ kind: 'Variable', name: {{ kind: 'Name', value: '{}' }} }},\n",
             var_name
@@ -1165,12 +1129,15 @@ impl<'a> TypeScriptGenerator<'a> {
                         self.output.push_str(" }");
                     }
                     _ => {
-                        self.output.push_str("{ kind: 'NamedType', name: { kind: 'Name', value: 'Unknown' } }");
+                        self.output.push_str(
+                            "{ kind: 'NamedType', name: { kind: 'Name', value: 'Unknown' } }",
+                        );
                     }
                 }
             }
             Type::List(inner, _) => {
-                self.output.push_str("{ kind: 'NonNullType', type: { kind: 'ListType', type: ");
+                self.output
+                    .push_str("{ kind: 'NonNullType', type: { kind: 'ListType', type: ");
                 self.write_type_node(inner);
                 self.output.push_str(" } }");
             }
@@ -1182,19 +1149,27 @@ impl<'a> TypeScriptGenerator<'a> {
                 ));
             }
             Type::Tuple(_) => {
-                self.output.push_str("{ kind: 'NamedType', name: { kind: 'Name', value: 'Tuple' } }");
+                self.output
+                    .push_str("{ kind: 'NamedType', name: { kind: 'Name', value: 'Tuple' } }");
             }
             Type::_Phantom(_) => {
-                self.output.push_str("{ kind: 'NamedType', name: { kind: 'Name', value: 'Unknown' } }");
+                self.output
+                    .push_str("{ kind: 'NamedType', name: { kind: 'Name', value: 'Unknown' } }");
             }
         }
     }
 
-    fn write_selection_set_node(&mut self, selection_set: &bgql_syntax::SelectionSet<'_>, indent: usize) {
+    fn write_selection_set_node(
+        &mut self,
+        selection_set: &bgql_syntax::SelectionSet<'_>,
+        indent: usize,
+    ) {
         let indent_str = "  ".repeat(indent);
         self.output.push_str("{\n");
-        self.output.push_str(&format!("{}  kind: 'SelectionSet',\n", indent_str));
-        self.output.push_str(&format!("{}  selections: [\n", indent_str));
+        self.output
+            .push_str(&format!("{}  kind: 'SelectionSet',\n", indent_str));
+        self.output
+            .push_str(&format!("{}  selections: [\n", indent_str));
 
         for selection in &selection_set.selections {
             self.write_selection_node(selection, indent + 2);
@@ -1211,7 +1186,8 @@ impl<'a> TypeScriptGenerator<'a> {
             Selection::Field(field) => {
                 let field_name = self.interner.get(field.name.value);
                 self.output.push_str(&format!("{}    {{\n", indent_str));
-                self.output.push_str(&format!("{}      kind: 'Field',\n", indent_str));
+                self.output
+                    .push_str(&format!("{}      kind: 'Field',\n", indent_str));
 
                 if let Some(alias) = &field.alias {
                     let alias_name = self.interner.get(alias.value);
@@ -1228,7 +1204,8 @@ impl<'a> TypeScriptGenerator<'a> {
 
                 // Write arguments if present
                 if !field.arguments.is_empty() {
-                    self.output.push_str(&format!("{}      arguments: [\n", indent_str));
+                    self.output
+                        .push_str(&format!("{}      arguments: [\n", indent_str));
                     for arg in &field.arguments {
                         self.write_argument_node(arg, indent + 4);
                     }
@@ -1237,7 +1214,8 @@ impl<'a> TypeScriptGenerator<'a> {
 
                 // Write nested selection set if present
                 if let Some(ref sub_selection) = field.selection_set {
-                    self.output.push_str(&format!("{}      selectionSet: ", indent_str));
+                    self.output
+                        .push_str(&format!("{}      selectionSet: ", indent_str));
                     self.write_selection_set_node(sub_selection, indent + 3);
                     self.output.push_str(",\n");
                 }
@@ -1247,7 +1225,8 @@ impl<'a> TypeScriptGenerator<'a> {
             Selection::FragmentSpread(spread) => {
                 let fragment_name = self.interner.get(spread.name.value);
                 self.output.push_str(&format!("{}    {{\n", indent_str));
-                self.output.push_str(&format!("{}      kind: 'FragmentSpread',\n", indent_str));
+                self.output
+                    .push_str(&format!("{}      kind: 'FragmentSpread',\n", indent_str));
                 self.output.push_str(&format!(
                     "{}      name: {{ kind: 'Name', value: '{}' }},\n",
                     indent_str, fragment_name
@@ -1256,7 +1235,8 @@ impl<'a> TypeScriptGenerator<'a> {
             }
             Selection::InlineFragment(inline) => {
                 self.output.push_str(&format!("{}    {{\n", indent_str));
-                self.output.push_str(&format!("{}      kind: 'InlineFragment',\n", indent_str));
+                self.output
+                    .push_str(&format!("{}      kind: 'InlineFragment',\n", indent_str));
 
                 if let Some(type_condition) = &inline.type_condition {
                     let type_name = self.interner.get(type_condition.value);
@@ -1266,7 +1246,8 @@ impl<'a> TypeScriptGenerator<'a> {
                     ));
                 }
 
-                self.output.push_str(&format!("{}      selectionSet: ", indent_str));
+                self.output
+                    .push_str(&format!("{}      selectionSet: ", indent_str));
                 self.write_selection_set_node(&inline.selection_set, indent + 3);
                 self.output.push_str(",\n");
 
@@ -1280,7 +1261,8 @@ impl<'a> TypeScriptGenerator<'a> {
         let arg_name = self.interner.get(arg.name.value);
 
         self.output.push_str(&format!("{}  {{\n", indent_str));
-        self.output.push_str(&format!("{}    kind: 'Argument',\n", indent_str));
+        self.output
+            .push_str(&format!("{}    kind: 'Argument',\n", indent_str));
         self.output.push_str(&format!(
             "{}    name: {{ kind: 'Name', value: '{}' }},\n",
             indent_str, arg_name
@@ -1358,7 +1340,6 @@ impl<'a> TypeScriptGenerator<'a> {
         }
     }
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     fn write_client_sdk(&mut self) {
         self.output.push_str(
             "// =============================================================================\n",
@@ -1585,8 +1566,6 @@ impl<'a> TypeScriptGenerator<'a> {
     }
 
     fn write_jsdoc(&mut self, doc: &str) {
-<<<<<<< HEAD
-=======
         self.write_jsdoc_with_deprecated(doc, false, None);
     }
 
@@ -1596,19 +1575,14 @@ impl<'a> TypeScriptGenerator<'a> {
         is_deprecated: bool,
         deprecation_reason: Option<&str>,
     ) {
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         self.output.push_str("/**\n");
         for line in doc.lines() {
             self.output.push_str(&format!(" * {}\n", line));
         }
-<<<<<<< HEAD
-        self.output.push_str(" */\n");
-    }
-
-=======
         if is_deprecated {
             if let Some(reason) = deprecation_reason {
-                self.output.push_str(&format!(" * @deprecated {}\n", reason));
+                self.output
+                    .push_str(&format!(" * @deprecated {}\n", reason));
             } else {
                 self.output.push_str(" * @deprecated\n");
             }
@@ -1619,7 +1593,8 @@ impl<'a> TypeScriptGenerator<'a> {
     fn write_deprecated_jsdoc(&mut self, deprecation_reason: Option<&str>) {
         self.output.push_str("/**\n");
         if let Some(reason) = deprecation_reason {
-            self.output.push_str(&format!(" * @deprecated {}\n", reason));
+            self.output
+                .push_str(&format!(" * @deprecated {}\n", reason));
         } else {
             self.output.push_str(" * @deprecated\n");
         }
@@ -1646,7 +1621,6 @@ impl<'a> TypeScriptGenerator<'a> {
         (false, None)
     }
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     fn is_optional(&self, ty: &Type<'_>) -> bool {
         matches!(ty, Type::Option(_, _))
     }
@@ -1697,17 +1671,10 @@ impl<'a> TypeConverter for TypeScriptGenerator<'a> {
 
     fn convert_scalar(&self, name: &str) -> String {
         match name {
-<<<<<<< HEAD
-            "Int" | "Float" => "number".to_string(),
-            "String" | "ID" => "string".to_string(),
-            "Boolean" => "boolean".to_string(),
-            "DateTime" => "string".to_string(),
-=======
             "Int" | "Float" | "Uint" => "number".to_string(),
             "String" | "ID" | "DateTime" | "Date" => "string".to_string(),
             "Boolean" => "boolean".to_string(),
             "Void" => "void".to_string(),
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
             "JSON" => "Record<string, unknown>".to_string(),
             other => other.to_string(),
         }
@@ -1721,8 +1688,6 @@ fn capitalize(s: &str) -> String {
         Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
     }
 }
-<<<<<<< HEAD
-=======
 
 #[cfg(test)]
 mod tests {
@@ -1863,7 +1828,8 @@ mod tests {
     #[test]
     fn test_type_guard_format() {
         // Test that union type guards have correct format
-        let type_guard = "isUser: (value: SearchResult): value is User => value.__typename === 'User',";
+        let type_guard =
+            "isUser: (value: SearchResult): value is User => value.__typename === 'User',";
 
         assert!(type_guard.contains("value is User"));
         assert!(type_guard.contains("__typename === 'User'"));
@@ -1974,4 +1940,3 @@ mod tests {
         assert!(expected.contains("string &"));
     }
 }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9

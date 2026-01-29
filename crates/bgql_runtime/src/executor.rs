@@ -1,14 +1,5 @@
 //! Query execution for Better GraphQL.
 
-<<<<<<< HEAD
-use crate::query::QueryPlan;
-use crate::schema::Schema;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
-/// Executor configuration.
-#[derive(Debug, Clone, Default)]
-=======
 use crate::query::{FieldInfo, PlanNode, QueryPlan};
 use crate::resolver::{ResolverArgs, ResolverInfo, ResolverMap};
 use crate::schema::Schema;
@@ -20,21 +11,11 @@ use tokio::sync::RwLock;
 
 /// Executor configuration.
 #[derive(Debug, Clone)]
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 pub struct ExecutorConfig {
     /// Maximum parallel execution depth.
     pub max_parallel_depth: usize,
     /// Enable tracing.
     pub tracing: bool,
-<<<<<<< HEAD
-}
-
-/// The query executor.
-#[derive(Debug)]
-pub struct Executor {
-    #[allow(dead_code)]
-    config: ExecutorConfig,
-=======
     /// Maximum concurrent field resolutions.
     pub max_concurrent_fields: usize,
     /// Timeout for field resolution in milliseconds.
@@ -56,7 +37,6 @@ impl Default for ExecutorConfig {
 pub struct Executor {
     config: ExecutorConfig,
     resolvers: Arc<ResolverMap>,
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 impl Default for Executor {
@@ -65,8 +45,6 @@ impl Default for Executor {
     }
 }
 
-<<<<<<< HEAD
-=======
 impl std::fmt::Debug for Executor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Executor")
@@ -75,32 +53,17 @@ impl std::fmt::Debug for Executor {
     }
 }
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 impl Executor {
     /// Creates a new executor.
     pub fn new() -> Self {
         Self {
             config: ExecutorConfig::default(),
-<<<<<<< HEAD
-=======
             resolvers: Arc::new(ResolverMap::new()),
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
     }
 
     /// Creates an executor with configuration.
     pub fn with_config(config: ExecutorConfig) -> Self {
-<<<<<<< HEAD
-        Self { config }
-    }
-
-    /// Executes a query plan.
-    pub async fn execute(&self, _plan: &QueryPlan, _schema: &Schema, _ctx: &Context) -> Response {
-        // TODO: Implement actual execution
-        Response {
-            data: None,
-            errors: None,
-=======
         Self {
             config,
             resolvers: Arc::new(ResolverMap::new()),
@@ -382,18 +345,11 @@ async fn resolve_field(
         None => {
             // No resolver found, try default property access
             parent.get(&info.name).cloned().unwrap_or(Value::Null)
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
     }
 }
 
 /// Execution context.
-<<<<<<< HEAD
-#[derive(Debug)]
-pub struct Context {
-    /// Request-scoped data.
-    pub data: HashMap<String, serde_json::Value>,
-=======
 #[derive(Clone)]
 struct ExecutionContext {
     schema: Schema,
@@ -410,7 +366,6 @@ pub struct Context {
     pub data: HashMap<String, serde_json::Value>,
     /// Variables from the request.
     pub variables: HashMap<String, serde_json::Value>,
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 impl Default for Context {
@@ -424,8 +379,6 @@ impl Context {
     pub fn new() -> Self {
         Self {
             data: HashMap::new(),
-<<<<<<< HEAD
-=======
             variables: HashMap::new(),
         }
     }
@@ -435,7 +388,6 @@ impl Context {
         Self {
             data: HashMap::new(),
             variables,
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         }
     }
 
@@ -452,8 +404,6 @@ impl Context {
             .get(key)
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
-<<<<<<< HEAD
-=======
 
     /// Gets a variable by name.
     pub fn variable(&self, name: &str) -> Option<&serde_json::Value> {
@@ -466,7 +416,6 @@ impl Context {
             .get(name)
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 /// A GraphQL response.
@@ -480,8 +429,6 @@ pub struct Response {
     pub errors: Option<Vec<FieldError>>,
 }
 
-<<<<<<< HEAD
-=======
 impl Response {
     /// Creates a successful response with data.
     pub fn data(data: serde_json::Value) -> Self {
@@ -518,7 +465,6 @@ impl Response {
     }
 }
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 /// A field error.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldError {
@@ -555,8 +501,6 @@ impl FieldError {
         self.path = Some(path);
         self
     }
-<<<<<<< HEAD
-=======
 
     /// Adds an extension.
     pub fn with_extension(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
@@ -916,5 +860,4 @@ mod tests {
         assert!(!error_response.has_data());
         assert!(error_response.has_errors());
     }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }

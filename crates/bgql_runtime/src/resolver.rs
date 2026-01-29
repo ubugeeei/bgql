@@ -42,10 +42,7 @@ impl ResolverArgs {
     }
 
     /// Gets a required argument, returning an error if not found.
-    pub fn require<T: serde::de::DeserializeOwned>(
-        &self,
-        name: &str,
-    ) -> Result<T, ResolverError> {
+    pub fn require<T: serde::de::DeserializeOwned>(&self, name: &str) -> Result<T, ResolverError> {
         self.args
             .get(name)
             .ok_or_else(|| ResolverError::MissingArgument(name.to_string()))
@@ -188,7 +185,8 @@ pub trait Resolver: Send + Sync {
 pub type BoxedResolver = Box<dyn Resolver>;
 
 /// A sync resolver function.
-pub type SyncResolverFn = Arc<dyn Fn(&Value, &ResolverArgs, &Context, &ResolverInfo) -> ResolverResult + Send + Sync>;
+pub type SyncResolverFn =
+    Arc<dyn Fn(&Value, &ResolverArgs, &Context, &ResolverInfo) -> ResolverResult + Send + Sync>;
 
 /// A wrapper for sync resolver functions.
 pub struct FnResolver {
@@ -199,7 +197,10 @@ impl FnResolver {
     /// Creates a new function resolver.
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn(&Value, &ResolverArgs, &Context, &ResolverInfo) -> ResolverResult + Send + Sync + 'static,
+        F: Fn(&Value, &ResolverArgs, &Context, &ResolverInfo) -> ResolverResult
+            + Send
+            + Sync
+            + 'static,
     {
         Self { func: Arc::new(f) }
     }
@@ -236,9 +237,7 @@ impl AsyncFnResolver {
         Fut: Future<Output = ResolverResult> + Send + 'static,
     {
         Self {
-            func: Arc::new(move |parent, args, ctx, info| {
-                Box::pin(f(parent, args, ctx, info))
-            }),
+            func: Arc::new(move |parent, args, ctx, info| Box::pin(f(parent, args, ctx, info))),
         }
     }
 }
@@ -346,7 +345,10 @@ impl ResolverMap {
         field_name: impl Into<String>,
         f: F,
     ) where
-        F: Fn(&Value, &ResolverArgs, &Context, &ResolverInfo) -> ResolverResult + Send + Sync + 'static,
+        F: Fn(&Value, &ResolverArgs, &Context, &ResolverInfo) -> ResolverResult
+            + Send
+            + Sync
+            + 'static,
     {
         self.register(type_name, field_name, FnResolver::new(f));
     }
@@ -442,7 +444,10 @@ mod tests {
         let info = ResolverInfo::new("user", "Query");
 
         let result = resolver.resolve(&parent, &args, &ctx, &info).await;
-        assert_eq!(result.unwrap(), serde_json::json!({"id": 42, "name": "User"}));
+        assert_eq!(
+            result.unwrap(),
+            serde_json::json!({"id": 42, "name": "User"})
+        );
     }
 
     #[tokio::test]

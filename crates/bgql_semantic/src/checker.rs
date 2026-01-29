@@ -2,10 +2,6 @@
 
 use crate::hir::HirDatabase;
 use crate::types::TypeRegistry;
-<<<<<<< HEAD
-use bgql_core::DiagnosticBag;
-use bgql_syntax::Document;
-=======
 use bgql_core::diagnostics::codes;
 use bgql_core::{DiagnosticBag, Interner, Text};
 use bgql_syntax::{
@@ -38,7 +34,6 @@ struct GenericTypeInfo {
     /// Type parameters with their constraints
     params: Vec<GenericTypeParam>,
 }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
 /// Type checker for Better GraphQL.
 pub struct TypeChecker<'a> {
@@ -46,9 +41,6 @@ pub struct TypeChecker<'a> {
     types: &'a TypeRegistry,
     #[allow(dead_code)]
     hir: &'a HirDatabase,
-<<<<<<< HEAD
-    diagnostics: DiagnosticBag,
-=======
     interner: &'a Interner,
     diagnostics: DiagnosticBag,
     /// Set of all defined type names
@@ -73,7 +65,6 @@ pub struct TypeChecker<'a> {
     type_locations: FxHashMap<String, bgql_core::Span>,
     /// Enable strict mode (treat some warnings as errors)
     strict_mode: bool,
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 /// Result of type checking.
@@ -90,23 +81,6 @@ impl CheckResult {
 
 impl<'a> TypeChecker<'a> {
     /// Creates a new type checker.
-<<<<<<< HEAD
-    pub fn new(types: &'a TypeRegistry, hir: &'a HirDatabase) -> Self {
-        Self {
-            types,
-            hir,
-            diagnostics: DiagnosticBag::new(),
-        }
-    }
-
-    /// Checks a document.
-    pub fn check(&mut self, _document: &Document<'_>) -> CheckResult {
-        // TODO: Implement type checking
-        // 1. Check all type references are valid
-        // 2. Check field types match
-        // 3. Check directive arguments
-        // 4. Check generic constraints
-=======
     pub fn new(types: &'a TypeRegistry, hir: &'a HirDatabase, interner: &'a Interner) -> Self {
         Self {
             types,
@@ -222,21 +196,11 @@ impl<'a> TypeChecker<'a> {
 
         // Phase 5: Naming convention warnings (if not strict mode)
         self.check_naming_conventions(document);
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 
         CheckResult {
             diagnostics: std::mem::take(&mut self.diagnostics),
         }
     }
-<<<<<<< HEAD
-}
-
-/// Type checks a document.
-pub fn check(document: &Document<'_>, types: &TypeRegistry, hir: &HirDatabase) -> CheckResult {
-    let mut checker = TypeChecker::new(types, hir);
-    checker.check(document)
-}
-=======
 
     /// Builds the type dependency graph.
     fn build_dependency_graph(&mut self, document: &Document<'_>) {
@@ -994,8 +958,7 @@ pub fn check(document: &Document<'_>, types: &TypeRegistry, hir: &HirDatabase) -
             Type::Named(named) => {
                 let name = self.interner.get(named.name);
                 // Allow type parameters that are in scope
-                if !self.defined_types.contains(&name)
-                    && !self.type_params_in_scope.contains(&name)
+                if !self.defined_types.contains(&name) && !self.type_params_in_scope.contains(&name)
                 {
                     self.diagnostics.error(
                         codes::UNDEFINED_TYPE,
@@ -1663,4 +1626,3 @@ mod tests {
             .any(|d| d.code == codes::GENERIC_CONSTRAINT_VIOLATION));
     }
 }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9

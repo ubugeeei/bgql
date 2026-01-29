@@ -14,20 +14,22 @@ use crate::error::{ErrorCode, SdkError, SdkResult};
 pub use crate::result::{BgqlError, BgqlResult};
 use bgql_core::Interner;
 use bgql_runtime::executor::{Context as RuntimeContext, Executor, ExecutorConfig};
-use bgql_runtime::query::{QueryPlanner, PlannerConfig};
+use bgql_runtime::query::{PlannerConfig, QueryPlanner};
 use bgql_runtime::resolver::ResolverMap;
 use bgql_runtime::schema::{
-    Schema, SchemaBuilder, TypeDef, ObjectDef, FieldDef, TypeRef, InputFieldDef,
-    ScalarDef, InterfaceDef, UnionDef, EnumDef, EnumValueDef, InputObjectDef,
+    EnumDef, EnumValueDef, FieldDef, InputFieldDef, InputObjectDef, InterfaceDef, ObjectDef,
+    ScalarDef, Schema, SchemaBuilder, TypeDef, TypeRef, UnionDef,
 };
-use bgql_semantic::hir::{HirOperation, HirOperationKind, HirSelection, HirFieldSelection, HirValue};
-use bgql_syntax::{parse, Definition, TypeDefinition, OperationType};
+use bgql_semantic::hir::{
+    HirFieldSelection, HirOperation, HirOperationKind, HirSelection, HirValue,
+};
+use bgql_syntax::{parse, Definition, OperationType, TypeDefinition};
+use indexmap::IndexMap;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use indexmap::IndexMap;
 
 /// Server configuration.
 #[derive(Debug, Clone)]
@@ -306,7 +308,10 @@ impl ServerBuilder {
                 self.sdl = Some(content);
             }
             Err(e) => {
-                eprintln!("[bgql] Warning: Could not read schema file '{}': {}", path_str, e);
+                eprintln!(
+                    "[bgql] Warning: Could not read schema file '{}': {}",
+                    path_str, e
+                );
             }
         }
         self
@@ -352,7 +357,8 @@ impl ServerBuilder {
                 resolver.field_name.clone(),
                 move |parent, args, _ctx, _info| {
                     let func = func.clone();
-                    let args_json = serde_json::to_value(args.all()).unwrap_or(serde_json::Value::Null);
+                    let args_json =
+                        serde_json::to_value(args.all()).unwrap_or(serde_json::Value::Null);
                     let _parent = parent.clone();
                     async move {
                         // Create SDK context from args
@@ -448,7 +454,9 @@ impl BgqlServer {
         }
 
         // Find the operation definition
-        let operation_def = parse_result.document.definitions
+        let operation_def = parse_result
+            .document
+            .definitions
             .iter()
             .find_map(|def| {
                 if let Definition::Operation(op) = def {
@@ -463,16 +471,22 @@ impl BgqlServer {
         let hir_operation = ast_operation_to_hir(operation_def, &self.interner);
 
         // Plan the query
-        let plan = self.planner.plan(&hir_operation, &self.schema)
+        let plan = self
+            .planner
+            .plan(&hir_operation, &self.schema)
             .map_err(|e| SdkError::new(ErrorCode::PlanError, e.message))?;
 
         // Execute the plan
         let runtime_ctx = ctx.to_runtime_context(variables);
-        let response = self.executor.execute(&plan, &self.schema, &runtime_ctx).await;
+        let response = self
+            .executor
+            .execute(&plan, &self.schema, &runtime_ctx)
+            .await;
 
         // Convert response to JSON
         if response.has_errors() {
-            let errors: Vec<String> = response.errors
+            let errors: Vec<String> = response
+                .errors
                 .unwrap_or_default()
                 .iter()
                 .map(|e| e.message.clone())
@@ -560,12 +574,10 @@ fn parse_sdl_to_schema(sdl: &str, interner: &Interner) -> SdkResult<Schema> {
 /// Converts AST type definition to runtime TypeDef.
 fn convert_type_definition(type_def: &TypeDefinition, interner: &Interner) -> TypeDef {
     match type_def {
-        TypeDefinition::Scalar(scalar) => {
-            TypeDef::Scalar(ScalarDef {
-                name: interner.get(scalar.name.value).to_string(),
-                description: scalar.description.as_ref().map(|d| d.value.to_string()),
-            })
-        }
+        TypeDefinition::Scalar(scalar) => TypeDef::Scalar(ScalarDef {
+            name: interner.get(scalar.name.value).to_string(),
+            description: scalar.description.as_ref().map(|d| d.value.to_string()),
+        }),
         TypeDefinition::Object(obj) => {
             let mut fields = IndexMap::new();
             for field in &obj.fields {
@@ -573,27 +585,37 @@ fn convert_type_definition(type_def: &TypeDefinition, interner: &Interner) -> Ty
                 let mut arguments = IndexMap::new();
                 for arg in &field.arguments {
                     let arg_name = interner.get(arg.name.value).to_string();
-                    arguments.insert(arg_name.clone(), InputFieldDef {
-                        name: arg_name,
-                        description: arg.description.as_ref().map(|d| d.value.to_string()),
-                        ty: convert_type(&arg.ty, interner),
-                        default_value: None,
-                    });
+                    arguments.insert(
+                        arg_name.clone(),
+                        InputFieldDef {
+                            name: arg_name,
+                            description: arg.description.as_ref().map(|d| d.value.to_string()),
+                            ty: convert_type(&arg.ty, interner),
+                            default_value: None,
+                        },
+                    );
                 }
-                fields.insert(field_name.clone(), FieldDef {
-                    name: field_name,
-                    description: field.description.as_ref().map(|d| d.value.to_string()),
-                    ty: convert_type(&field.ty, interner),
-                    arguments,
-                    deprecated: false,
-                    deprecation_reason: None,
-                });
+                fields.insert(
+                    field_name.clone(),
+                    FieldDef {
+                        name: field_name,
+                        description: field.description.as_ref().map(|d| d.value.to_string()),
+                        ty: convert_type(&field.ty, interner),
+                        arguments,
+                        deprecated: false,
+                        deprecation_reason: None,
+                    },
+                );
             }
             TypeDef::Object(ObjectDef {
                 name: interner.get(obj.name.value).to_string(),
                 description: obj.description.as_ref().map(|d| d.value.to_string()),
                 fields,
-                implements: obj.implements.iter().map(|n| interner.get(n.value).to_string()).collect(),
+                implements: obj
+                    .implements
+                    .iter()
+                    .map(|n| interner.get(n.value).to_string())
+                    .collect(),
             })
         }
         TypeDefinition::Interface(iface) => {
@@ -603,43 +625,59 @@ fn convert_type_definition(type_def: &TypeDefinition, interner: &Interner) -> Ty
                 let mut arguments = IndexMap::new();
                 for arg in &field.arguments {
                     let arg_name = interner.get(arg.name.value).to_string();
-                    arguments.insert(arg_name.clone(), InputFieldDef {
-                        name: arg_name,
-                        description: arg.description.as_ref().map(|d| d.value.to_string()),
-                        ty: convert_type(&arg.ty, interner),
-                        default_value: None,
-                    });
+                    arguments.insert(
+                        arg_name.clone(),
+                        InputFieldDef {
+                            name: arg_name,
+                            description: arg.description.as_ref().map(|d| d.value.to_string()),
+                            ty: convert_type(&arg.ty, interner),
+                            default_value: None,
+                        },
+                    );
                 }
-                fields.insert(field_name.clone(), FieldDef {
-                    name: field_name,
-                    description: field.description.as_ref().map(|d| d.value.to_string()),
-                    ty: convert_type(&field.ty, interner),
-                    arguments,
-                    deprecated: false,
-                    deprecation_reason: None,
-                });
+                fields.insert(
+                    field_name.clone(),
+                    FieldDef {
+                        name: field_name,
+                        description: field.description.as_ref().map(|d| d.value.to_string()),
+                        ty: convert_type(&field.ty, interner),
+                        arguments,
+                        deprecated: false,
+                        deprecation_reason: None,
+                    },
+                );
             }
             TypeDef::Interface(InterfaceDef {
                 name: interner.get(iface.name.value).to_string(),
                 description: iface.description.as_ref().map(|d| d.value.to_string()),
                 fields,
-                implements: iface.implements.iter().map(|n| interner.get(n.value).to_string()).collect(),
+                implements: iface
+                    .implements
+                    .iter()
+                    .map(|n| interner.get(n.value).to_string())
+                    .collect(),
             })
         }
-        TypeDefinition::Union(union_def) => {
-            TypeDef::Union(UnionDef {
-                name: interner.get(union_def.name.value).to_string(),
-                description: union_def.description.as_ref().map(|d| d.value.to_string()),
-                members: union_def.members.iter().map(|n| interner.get(n.value).to_string()).collect(),
-            })
-        }
+        TypeDefinition::Union(union_def) => TypeDef::Union(UnionDef {
+            name: interner.get(union_def.name.value).to_string(),
+            description: union_def.description.as_ref().map(|d| d.value.to_string()),
+            members: union_def
+                .members
+                .iter()
+                .map(|n| interner.get(n.value).to_string())
+                .collect(),
+        }),
         TypeDefinition::Enum(enum_def) => {
-            let values = enum_def.values.iter().map(|v| EnumValueDef {
-                name: interner.get(v.name.value).to_string(),
-                description: v.description.as_ref().map(|d| d.value.to_string()),
-                deprecated: false,
-                deprecation_reason: None,
-            }).collect();
+            let values = enum_def
+                .values
+                .iter()
+                .map(|v| EnumValueDef {
+                    name: interner.get(v.name.value).to_string(),
+                    description: v.description.as_ref().map(|d| d.value.to_string()),
+                    deprecated: false,
+                    deprecation_reason: None,
+                })
+                .collect();
             TypeDef::Enum(EnumDef {
                 name: interner.get(enum_def.name.value).to_string(),
                 description: enum_def.description.as_ref().map(|d| d.value.to_string()),
@@ -650,12 +688,15 @@ fn convert_type_definition(type_def: &TypeDefinition, interner: &Interner) -> Ty
             let mut fields = IndexMap::new();
             for field in &input.fields {
                 let field_name = interner.get(field.name.value).to_string();
-                fields.insert(field_name.clone(), InputFieldDef {
-                    name: field_name,
-                    description: field.description.as_ref().map(|d| d.value.to_string()),
-                    ty: convert_type(&field.ty, interner),
-                    default_value: None,
-                });
+                fields.insert(
+                    field_name.clone(),
+                    InputFieldDef {
+                        name: field_name,
+                        description: field.description.as_ref().map(|d| d.value.to_string()),
+                        ty: convert_type(&field.ty, interner),
+                        default_value: None,
+                    },
+                );
             }
             TypeDef::InputObject(InputObjectDef {
                 name: interner.get(input.name.value).to_string(),
@@ -664,32 +705,37 @@ fn convert_type_definition(type_def: &TypeDefinition, interner: &Interner) -> Ty
             })
         }
         // Handle other type definitions as scalars for now
-        TypeDefinition::Opaque(opaque) => {
-            TypeDef::Scalar(ScalarDef {
-                name: interner.get(opaque.name.value).to_string(),
-                description: opaque.description.as_ref().map(|d| d.value.to_string()),
-            })
-        }
-        TypeDefinition::TypeAlias(alias) => {
-            TypeDef::Scalar(ScalarDef {
-                name: interner.get(alias.name.value).to_string(),
-                description: alias.description.as_ref().map(|d| d.value.to_string()),
-            })
-        }
-        TypeDefinition::InputUnion(input_union) => {
-            TypeDef::Union(UnionDef {
-                name: interner.get(input_union.name.value).to_string(),
-                description: input_union.description.as_ref().map(|d| d.value.to_string()),
-                members: input_union.members.iter().map(|n| interner.get(n.value).to_string()).collect(),
-            })
-        }
+        TypeDefinition::Opaque(opaque) => TypeDef::Scalar(ScalarDef {
+            name: interner.get(opaque.name.value).to_string(),
+            description: opaque.description.as_ref().map(|d| d.value.to_string()),
+        }),
+        TypeDefinition::TypeAlias(alias) => TypeDef::Scalar(ScalarDef {
+            name: interner.get(alias.name.value).to_string(),
+            description: alias.description.as_ref().map(|d| d.value.to_string()),
+        }),
+        TypeDefinition::InputUnion(input_union) => TypeDef::Union(UnionDef {
+            name: interner.get(input_union.name.value).to_string(),
+            description: input_union
+                .description
+                .as_ref()
+                .map(|d| d.value.to_string()),
+            members: input_union
+                .members
+                .iter()
+                .map(|n| interner.get(n.value).to_string())
+                .collect(),
+        }),
         TypeDefinition::InputEnum(input_enum) => {
-            let values = input_enum.variants.iter().map(|v| EnumValueDef {
-                name: interner.get(v.name.value).to_string(),
-                description: v.description.as_ref().map(|d| d.value.to_string()),
-                deprecated: false,
-                deprecation_reason: None,
-            }).collect();
+            let values = input_enum
+                .variants
+                .iter()
+                .map(|v| EnumValueDef {
+                    name: interner.get(v.name.value).to_string(),
+                    description: v.description.as_ref().map(|d| d.value.to_string()),
+                    deprecated: false,
+                    deprecation_reason: None,
+                })
+                .collect();
             TypeDef::Enum(EnumDef {
                 name: interner.get(input_enum.name.value).to_string(),
                 description: input_enum.description.as_ref().map(|d| d.value.to_string()),
@@ -702,15 +748,11 @@ fn convert_type_definition(type_def: &TypeDefinition, interner: &Interner) -> Ty
 /// Converts AST type to runtime TypeRef.
 fn convert_type(ty: &bgql_syntax::Type, interner: &Interner) -> TypeRef {
     match ty {
-        bgql_syntax::Type::Named(named) => {
-            TypeRef::Named(interner.get(named.name).to_string())
-        }
+        bgql_syntax::Type::Named(named) => TypeRef::Named(interner.get(named.name).to_string()),
         bgql_syntax::Type::Option(inner, _) => {
             TypeRef::Option(Box::new(convert_type(inner, interner)))
         }
-        bgql_syntax::Type::List(inner, _) => {
-            TypeRef::List(Box::new(convert_type(inner, interner)))
-        }
+        bgql_syntax::Type::List(inner, _) => TypeRef::List(Box::new(convert_type(inner, interner))),
         bgql_syntax::Type::Generic(generic) => {
             // Treat generic types as named types for now
             TypeRef::Named(interner.get(generic.name).to_string())
@@ -739,7 +781,9 @@ fn ast_operation_to_hir(
 
     let name = op.name.as_ref().map(|n| interner.get(n.value).to_string());
 
-    let selections = op.selection_set.selections
+    let selections = op
+        .selection_set
+        .selections
         .iter()
         .map(|sel| convert_selection(sel, interner))
         .collect();
@@ -754,15 +798,16 @@ fn ast_operation_to_hir(
 }
 
 /// Converts AST selection to HIR selection.
-fn convert_selection(
-    sel: &bgql_syntax::Selection,
-    interner: &Interner,
-) -> HirSelection {
+fn convert_selection(sel: &bgql_syntax::Selection, interner: &Interner) -> HirSelection {
     match sel {
         bgql_syntax::Selection::Field(field) => {
-            let alias = field.alias.as_ref().map(|a| interner.get(a.value).to_string());
+            let alias = field
+                .alias
+                .as_ref()
+                .map(|a| interner.get(a.value).to_string());
             let name = interner.get(field.name.value).to_string();
-            let arguments: Vec<(String, HirValue)> = field.arguments
+            let arguments: Vec<(String, HirValue)> = field
+                .arguments
                 .iter()
                 .map(|arg| {
                     let arg_name = interner.get(arg.name.value).to_string();
@@ -770,9 +815,15 @@ fn convert_selection(
                     (arg_name, arg_value)
                 })
                 .collect();
-            let selections = field.selection_set
+            let selections = field
+                .selection_set
                 .as_ref()
-                .map(|ss| ss.selections.iter().map(|s| convert_selection(s, interner)).collect())
+                .map(|ss| {
+                    ss.selections
+                        .iter()
+                        .map(|s| convert_selection(s, interner))
+                        .collect()
+                })
                 .unwrap_or_default();
 
             HirSelection::Field(HirFieldSelection {
@@ -786,9 +837,13 @@ fn convert_selection(
             HirSelection::FragmentSpread(interner.get(spread.name.value).to_string())
         }
         bgql_syntax::Selection::InlineFragment(inline) => {
-            let type_condition = inline.type_condition.as_ref()
+            let type_condition = inline
+                .type_condition
+                .as_ref()
                 .map(|tc| interner.get(tc.value).to_string());
-            let selections = inline.selection_set.selections
+            let selections = inline
+                .selection_set
+                .selections
                 .iter()
                 .map(|s| convert_selection(s, interner))
                 .collect();
@@ -812,21 +867,21 @@ fn convert_value(value: &bgql_syntax::Value, interner: &Interner) -> HirValue {
         bgql_syntax::Value::String(s, _) => HirValue::String(s.clone()),
         bgql_syntax::Value::Boolean(b, _) => HirValue::Boolean(*b),
         bgql_syntax::Value::Null(_) => HirValue::Null,
-        bgql_syntax::Value::Enum(name) => {
-            HirValue::Enum(interner.get(name.value).to_string())
-        }
+        bgql_syntax::Value::Enum(name) => HirValue::Enum(interner.get(name.value).to_string()),
         bgql_syntax::Value::List(items, _) => {
             HirValue::List(items.iter().map(|v| convert_value(v, interner)).collect())
         }
-        bgql_syntax::Value::Object(fields, _) => {
-            HirValue::Object(
-                fields.iter()
-                    .map(|(name, value)| {
-                        (interner.get(name.value).to_string(), convert_value(value, interner))
-                    })
-                    .collect()
-            )
-        }
+        bgql_syntax::Value::Object(fields, _) => HirValue::Object(
+            fields
+                .iter()
+                .map(|(name, value)| {
+                    (
+                        interner.get(name.value).to_string(),
+                        convert_value(value, interner),
+                    )
+                })
+                .collect(),
+        ),
         bgql_syntax::Value::_Phantom(_) => {
             // Phantom variant, should not occur in practice
             HirValue::Null
@@ -918,11 +973,13 @@ mod tests {
     #[tokio::test]
     async fn test_server_builder_with_sdl() {
         let server = BgqlServer::builder()
-            .schema_sdl(r#"
+            .schema_sdl(
+                r#"
                 type Query {
                     hello: String
                 }
-            "#)
+            "#,
+            )
             .build();
 
         assert!(server.is_ok());
@@ -931,22 +988,22 @@ mod tests {
     #[tokio::test]
     async fn test_execute_simple_query() {
         let server = BgqlServer::builder()
-            .schema_sdl(r#"
+            .schema_sdl(
+                r#"
                 type Query {
                     hello: String
                 }
-            "#)
+            "#,
+            )
             .resolver("Query", "hello", |_args, _ctx| async {
                 Ok(serde_json::json!("Hello, World!"))
             })
             .build()
             .unwrap();
 
-        let result = server.execute(
-            "query { hello }",
-            None,
-            Context::new(),
-        ).await;
+        let result = server
+            .execute("query { hello }", None, Context::new())
+            .await;
 
         assert!(result.is_ok(), "Query execution failed: {:?}", result.err());
         let data = result.unwrap();

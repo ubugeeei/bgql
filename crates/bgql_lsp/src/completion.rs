@@ -234,8 +234,6 @@ fn keyword_completions() -> Vec<CompletionItem> {
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
         },
-<<<<<<< HEAD
-=======
         // Module system keywords
         CompletionItem {
             label: "mod".to_string(),
@@ -285,7 +283,6 @@ fn keyword_completions() -> Vec<CompletionItem> {
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
         },
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     ]
 }
 
@@ -466,8 +463,6 @@ fn directive_completions(document: &Document<'_>, interner: &Interner) -> Vec<Co
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
         },
-<<<<<<< HEAD
-=======
         // Streaming directives
         CompletionItem {
             label: "defer".to_string(),
@@ -618,7 +613,6 @@ fn directive_completions(document: &Document<'_>, interner: &Interner) -> Vec<Co
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
         },
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     ];
 
     // User-defined directives

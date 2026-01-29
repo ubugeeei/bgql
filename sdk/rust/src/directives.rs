@@ -31,6 +31,8 @@
 
 // Re-export all directive types from runtime
 pub use bgql_runtime::directives::{
+    // Utility function
+    create_streaming_directives,
     // @binary directive
     BinaryDirective,
     // @boundary directive
@@ -58,8 +60,6 @@ pub use bgql_runtime::directives::{
     ServerDirective,
     // @stream directive (extended)
     StreamDirective,
-    // Utility function
-    create_streaming_directives,
 };
 
 // Re-export resource level from resource module
@@ -386,7 +386,9 @@ mod tests {
 
     #[test]
     fn test_cache_directive() {
-        let cache = CacheDirective::public(300).with_swr(60).vary_on("Authorization");
+        let cache = CacheDirective::public(300)
+            .with_swr(60)
+            .vary_on("Authorization");
 
         assert_eq!(cache.max_age, 300);
         assert_eq!(cache.scope, CacheScope::Public);
@@ -434,8 +436,7 @@ mod tests {
         directives.defer = Some(DeferDirective::labeled("test"));
         assert!(directives.has_streaming());
 
-        directives.require_auth =
-            Some(RequireAuthDirective::with_roles(vec!["Admin".to_string()]));
+        directives.require_auth = Some(RequireAuthDirective::with_roles(vec!["Admin".to_string()]));
         assert!(directives.requires_auth());
         assert_eq!(
             directives.required_roles(),

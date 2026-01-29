@@ -514,9 +514,14 @@ mod tests {
     fn test_transform() {
         assert_eq!(transform::trim("  hello  "), "hello");
         assert_eq!(transform::lowercase("HELLO"), "hello");
-        assert_eq!(transform::normalize_email("  TEST@Example.COM  "), "test@example.com");
-        assert_eq!(transform::sanitize_html("<script>alert('xss')</script>"),
-            "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;");
+        assert_eq!(
+            transform::normalize_email("  TEST@Example.COM  "),
+            "test@example.com"
+        );
+        assert_eq!(
+            transform::sanitize_html("<script>alert('xss')</script>"),
+            "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;"
+        );
     }
 
     #[test]

@@ -21,6 +21,11 @@ thiserror.workspace = true
 rustc-hash.workspace = true
 indexmap.workspace = true
 regex = "1.10"
+bytes = "1.5"
+hyper = { version = "1.4", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["server", "tokio"] }
+http-body-util = "0.1"
+tracing.workspace = true
 
 [dev-dependencies]
 

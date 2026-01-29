@@ -28,11 +28,10 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{quote, format_ident};
+use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input, Attribute, DeriveInput, Fields, FnArg, Ident, ItemFn,
-    ItemStruct, LitStr, ReturnType, Token, Type,
-    punctuated::Punctuated,
+    parse_macro_input, punctuated::Punctuated, Attribute, DeriveInput, Fields, FnArg, Ident,
+    ItemFn, ItemStruct, LitStr, ReturnType, Token, Type,
 };
 
 /// Derive macro for typed GraphQL operations.
@@ -124,7 +123,9 @@ pub fn resolver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_asyncness = &input.sig.asyncness;
 
     let type_name = &args.type_name;
-    let field_name = args.field_name.as_ref()
+    let field_name = args
+        .field_name
+        .as_ref()
         .map(|s| s.value())
         .unwrap_or_else(|| fn_name.to_string());
 
@@ -177,7 +178,10 @@ impl syn::parse::Parse for ResolverArgs {
             None
         };
 
-        Ok(ResolverArgs { type_name, field_name })
+        Ok(ResolverArgs {
+            type_name,
+            field_name,
+        })
     }
 }
 
@@ -328,10 +332,17 @@ fn parse_graphql_string(input: &str) -> (String, String, Vec<String>, String) {
     // Extract operation name (simplified)
     let name_start = input.find(char::is_alphabetic).unwrap_or(0);
     let rest = &input[name_start..];
-    let name_end = rest.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(rest.len());
+    let name_end = rest
+        .find(|c: char| !c.is_alphanumeric() && c != '_')
+        .unwrap_or(rest.len());
     let op_name = &rest[..name_end];
 
-    (op_kind.to_string(), op_name.to_string(), vec![], input.to_string())
+    (
+        op_kind.to_string(),
+        op_name.to_string(),
+        vec![],
+        input.to_string(),
+    )
 }
 
 /// Macro for defining field arguments.
@@ -355,15 +366,17 @@ pub fn args(input: TokenStream) -> TokenStream {
     let fields = &input.fields;
 
     let field_impls = match fields {
-        Fields::Named(named) => {
-            named.named.iter().map(|f| {
+        Fields::Named(named) => named
+            .named
+            .iter()
+            .map(|f| {
                 let fname = &f.ident;
                 let fty = &f.ty;
                 quote! {
                     pub #fname: #fty
                 }
-            }).collect::<Vec<_>>()
-        }
+            })
+            .collect::<Vec<_>>(),
         _ => vec![],
     };
 
@@ -413,18 +426,25 @@ pub fn resolvers(input: TokenStream) -> TokenStream {
             if parts.len() == 2 {
                 let field = parts[0].trim().trim_end_matches(',');
                 let resolver = parts[1].trim().trim_end_matches(',');
-                registrations.push((current_type.to_string(), field.to_string(), resolver.to_string()));
+                registrations.push((
+                    current_type.to_string(),
+                    field.to_string(),
+                    resolver.to_string(),
+                ));
             }
         }
     }
 
-    let register_calls: Vec<TokenStream2> = registrations.iter().map(|(type_name, field, resolver)| {
-        let type_ident = format_ident!("{}", type_name);
-        let resolver_ident = format_ident!("{}", resolver);
-        quote! {
-            builder.register(stringify!(#type_ident), #field, #resolver_ident);
-        }
-    }).collect();
+    let register_calls: Vec<TokenStream2> = registrations
+        .iter()
+        .map(|(type_name, field, resolver)| {
+            let type_ident = format_ident!("{}", type_name);
+            let resolver_ident = format_ident!("{}", resolver);
+            quote! {
+                builder.register(stringify!(#type_ident), #field, #resolver_ident);
+            }
+        })
+        .collect();
 
     let expanded = quote! {
         {

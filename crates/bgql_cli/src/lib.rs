@@ -3,12 +3,9 @@
 //! # Usage
 //!
 //! ```bash
-<<<<<<< HEAD
-=======
 //! # Initialize a new project
 //! bgql init my-api
 //!
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 //! # Validate a schema
 //! bgql check schema.bgql
 //!
@@ -18,8 +15,6 @@
 //! # Generate TypeScript types
 //! bgql codegen --lang typescript schema.bgql
 //!
-<<<<<<< HEAD
-=======
 //! # Start the development server
 //! bgql dev
 //!
@@ -29,18 +24,13 @@
 //! # Watch for changes
 //! bgql watch
 //!
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 //! # Start the language server
 //! bgql lsp
 //! ```
 
 use bgql_core::Interner;
 use bgql_syntax::{parse, FormatOptions};
-<<<<<<< HEAD
-use clap::{Parser, Subcommand};
-=======
 use clap::{Parser, Subcommand, ValueEnum};
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 use colored::Colorize;
 use std::path::{Path, PathBuf};
 
@@ -58,10 +48,6 @@ pub struct Cli {
     pub command: Commands,
 }
 
-<<<<<<< HEAD
-#[derive(Subcommand, Debug)]
-pub enum Commands {
-=======
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum ProjectTemplate {
     /// Minimal project with basic schema
@@ -111,16 +97,11 @@ pub enum Commands {
         no_git: bool,
     },
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     /// Check GraphQL files for errors
     Check {
         #[arg(required = true)]
         files: Vec<PathBuf>,
 
-<<<<<<< HEAD
-        #[arg(long)]
-        strict: bool,
-=======
         /// Enable strict mode (treat warnings as errors)
         #[arg(long)]
         strict: bool,
@@ -132,7 +113,6 @@ pub enum Commands {
         /// Maximum allowed query depth
         #[arg(long, default_value = "10")]
         max_depth: usize,
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     },
 
     /// Format GraphQL files
@@ -141,14 +121,6 @@ pub enum Commands {
         #[arg(required = true)]
         files: Vec<PathBuf>,
 
-<<<<<<< HEAD
-        #[arg(long)]
-        check: bool,
-
-        #[arg(long, default_value = "2")]
-        indent: usize,
-
-=======
         /// Check if files are formatted (don't modify)
         #[arg(long)]
         check: bool,
@@ -158,23 +130,12 @@ pub enum Commands {
         indent: usize,
 
         /// Use tabs instead of spaces
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         #[arg(long)]
         tabs: bool,
     },
 
     /// Generate code from GraphQL schema
     Codegen {
-<<<<<<< HEAD
-        #[arg(required = true)]
-        schema: PathBuf,
-
-        #[arg(short, long)]
-        output: Option<PathBuf>,
-
-        #[arg(short, long, default_value = "typescript")]
-        lang: String,
-=======
         /// Schema file path
         #[arg(required = true)]
         schema: PathBuf,
@@ -247,7 +208,6 @@ pub enum Commands {
         /// File extensions to watch
         #[arg(short, long, default_value = "bgql,graphql")]
         extensions: String,
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     },
 
     /// Start the language server
@@ -255,23 +215,16 @@ pub enum Commands {
 
     /// Parse a GraphQL file and print the AST
     Parse {
-<<<<<<< HEAD
-        file: PathBuf,
-
-=======
         /// File to parse
         file: PathBuf,
 
         /// Output format (pretty, json, sexp)
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         #[arg(long, default_value = "pretty")]
         format: String,
     },
 
     /// Print version information
     Version,
-<<<<<<< HEAD
-=======
 
     /// IDE/Editor integration
     Ide {
@@ -291,14 +244,10 @@ pub enum Commands {
         #[arg(long)]
         info: bool,
     },
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 }
 
 pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
     match cli.command {
-<<<<<<< HEAD
-        Commands::Check { files, strict } => check_files(&files, strict, cli.verbose),
-=======
         Commands::Init { .. } => {
             println!("Init command not yet implemented");
             Ok(0)
@@ -309,7 +258,6 @@ pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             complexity: _,
             max_depth: _,
         } => check_files(&files, strict, cli.verbose),
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         Commands::Fmt {
             files,
             check,
@@ -320,9 +268,6 @@ pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             schema,
             output,
             lang,
-<<<<<<< HEAD
-        } => generate_code(&schema, output.as_ref(), &lang),
-=======
             watch: _,
         } => {
             let lang_str = match lang {
@@ -344,7 +289,6 @@ pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             println!("Watch command not yet implemented");
             Ok(0)
         }
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
         Commands::Lsp => {
             // Handled in main.rs
             Ok(0)
@@ -354,15 +298,12 @@ pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             println!("bgql {}", env!("CARGO_PKG_VERSION"));
             Ok(0)
         }
-<<<<<<< HEAD
-=======
         Commands::Ide {
             target,
             install,
             uninstall,
             info,
         } => handle_ide_command(target, install, uninstall, info, cli.verbose),
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
     }
 }
 
@@ -718,8 +659,6 @@ fn capitalize(s: &str) -> String {
     }
 }
 
-<<<<<<< HEAD
-=======
 fn handle_ide_command(
     target: IdeTarget,
     install: bool,
@@ -765,7 +704,11 @@ fn handle_zed_command(
         println!();
 
         if bgql_ext_dir.exists() {
-            println!("  Status: {} (at {})", "Installed".green(), bgql_ext_dir.display());
+            println!(
+                "  Status: {} (at {})",
+                "Installed".green(),
+                bgql_ext_dir.display()
+            );
         } else {
             println!("  Status: {}", "Not installed".yellow());
             println!();
@@ -777,7 +720,10 @@ fn handle_zed_command(
     if uninstall {
         if bgql_ext_dir.exists() {
             std::fs::remove_dir_all(&bgql_ext_dir)?;
-            println!("{} Removed bgql extension from Zed", "Success:".green().bold());
+            println!(
+                "{} Removed bgql extension from Zed",
+                "Success:".green().bold()
+            );
         } else {
             println!("{} bgql extension is not installed", "Info:".blue());
         }
@@ -789,7 +735,11 @@ fn handle_zed_command(
         let extension_src = get_extension_source_dir()?;
 
         if verbose {
-            println!("{} Extension source: {}", "Info:".blue(), extension_src.display());
+            println!(
+                "{} Extension source: {}",
+                "Info:".blue(),
+                extension_src.display()
+            );
         }
 
         // Create extensions directory if it doesn't exist
@@ -798,11 +748,17 @@ fn handle_zed_command(
         // Copy extension files
         copy_dir_recursive(&extension_src, &bgql_ext_dir)?;
 
-        println!("{} Installed bgql extension to Zed", "Success:".green().bold());
+        println!(
+            "{} Installed bgql extension to Zed",
+            "Success:".green().bold()
+        );
         println!();
         println!("  Location: {}", bgql_ext_dir.display());
         println!();
-        println!("  {} Restart Zed to activate the extension", "Note:".yellow());
+        println!(
+            "  {} Restart Zed to activate the extension",
+            "Note:".yellow()
+        );
 
         return Ok(0);
     }
@@ -859,7 +815,6 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
->>>>>>> 703747c251d776e50c5464e836b0be66b7f8ebc9
 fn parse_file(file: &Path, fmt: &str) -> Result<i32, Box<dyn std::error::Error>> {
     let source = std::fs::read_to_string(file)?;
     let interner = Interner::new();
