@@ -304,12 +304,9 @@ pub trait ServerBuilderExt {
     fn mutation_resolvers(self, resolvers: Arc<dyn MutationResolvers>) -> Self;
 }
 
-fn parse_args<T: for<'de> serde::Deserialize<'de>>(
-    args: serde_json::Value,
-) -> SdkResult<T> {
-    serde_json::from_value(args).map_err(|e| {
-        bgql_sdk::SdkError::new(bgql_sdk::ErrorCode::DeserializeError, e.to_string())
-    })
+fn parse_args<T: for<'de> serde::Deserialize<'de>>(args: serde_json::Value) -> SdkResult<T> {
+    serde_json::from_value(args)
+        .map_err(|e| bgql_sdk::SdkError::new(bgql_sdk::ErrorCode::DeserializeError, e.to_string()))
 }
 
 impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {

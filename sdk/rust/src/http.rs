@@ -250,8 +250,11 @@ pub(crate) async fn run_server(server: Arc<BgqlServer>) -> SdkResult<()> {
                         .unwrap(),
 
                     (Method::POST, "/bgql") => {
-                        let body_bytes =
-                            body.collect().await.map(|c| c.to_bytes()).unwrap_or_default();
+                        let body_bytes = body
+                            .collect()
+                            .await
+                            .map(|c| c.to_bytes())
+                            .unwrap_or_default();
                         handle_graphql_request(body_bytes, server_ref).await
                     }
 
@@ -267,7 +270,10 @@ pub(crate) async fn run_server(server: Arc<BgqlServer>) -> SdkResult<()> {
                         .status(StatusCode::OK)
                         .header("Access-Control-Allow-Origin", "*")
                         .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                        .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+                        .header(
+                            "Access-Control-Allow-Headers",
+                            "Content-Type, Authorization",
+                        )
                         .body(full(""))
                         .unwrap(),
 
