@@ -5,7 +5,8 @@
 #![allow(unused_imports)]
 
 use async_trait::async_trait;
-use bgql_sdk::server::{Context, SdkResult};
+use bgql_sdk::server::Context;
+use bgql_sdk::SdkResult;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -303,13 +304,21 @@ pub trait ServerBuilderExt {
     fn mutation_resolvers(self, resolvers: Arc<dyn MutationResolvers>) -> Self;
 }
 
+fn parse_args<T: for<'de> serde::Deserialize<'de>>(
+    args: serde_json::Value,
+) -> SdkResult<T> {
+    serde_json::from_value(args).map_err(|e| {
+        bgql_sdk::SdkError::new(bgql_sdk::ErrorCode::DeserializeError, e.to_string())
+    })
+}
+
 impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {
     fn query_resolvers(mut self, resolvers: Arc<dyn QueryResolvers>) -> Self {
         let r = resolvers.clone();
         self = self.resolver("Query", "user", move |args, ctx| {
             let r = r.clone();
             async move {
-                let parsed: UserArgs = serde_json::from_value(args)?;
+                let parsed: UserArgs = parse_args(args)?;
                 r.user(&ctx, parsed).await
             }
         });
@@ -327,7 +336,7 @@ impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {
         self = self.resolver("Query", "post", move |args, ctx| {
             let r = r.clone();
             async move {
-                let parsed: PostArgs = serde_json::from_value(args)?;
+                let parsed: PostArgs = parse_args(args)?;
                 r.post(&ctx, parsed).await
             }
         });
@@ -349,7 +358,7 @@ impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {
         self = self.resolver("Mutation", "createPost", move |args, ctx| {
             let r = r.clone();
             async move {
-                let parsed: CreatePostArgs = serde_json::from_value(args)?;
+                let parsed: CreatePostArgs = parse_args(args)?;
                 r.create_post(&ctx, parsed).await
             }
         });
@@ -358,7 +367,7 @@ impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {
         self = self.resolver("Mutation", "updatePost", move |args, ctx| {
             let r = r.clone();
             async move {
-                let parsed: UpdatePostArgs = serde_json::from_value(args)?;
+                let parsed: UpdatePostArgs = parse_args(args)?;
                 r.update_post(&ctx, parsed).await
             }
         });
@@ -367,7 +376,7 @@ impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {
         self = self.resolver("Mutation", "publishPost", move |args, ctx| {
             let r = r.clone();
             async move {
-                let parsed: PublishPostArgs = serde_json::from_value(args)?;
+                let parsed: PublishPostArgs = parse_args(args)?;
                 r.publish_post(&ctx, parsed).await
             }
         });
@@ -376,7 +385,7 @@ impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {
         self = self.resolver("Mutation", "deletePost", move |args, ctx| {
             let r = r.clone();
             async move {
-                let parsed: DeletePostArgs = serde_json::from_value(args)?;
+                let parsed: DeletePostArgs = parse_args(args)?;
                 r.delete_post(&ctx, parsed).await
             }
         });
@@ -385,7 +394,7 @@ impl ServerBuilderExt for bgql_sdk::server::ServerBuilder {
         self = self.resolver("Mutation", "createComment", move |args, ctx| {
             let r = r.clone();
             async move {
-                let parsed: CreateCommentArgs = serde_json::from_value(args)?;
+                let parsed: CreateCommentArgs = parse_args(args)?;
                 r.create_comment(&ctx, parsed).await
             }
         });

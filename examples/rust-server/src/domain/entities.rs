@@ -101,6 +101,13 @@ pub struct Comment {
     pub created_at: DateTime<Utc>,
 }
 
+// Filters
+#[derive(Debug, Clone, Default)]
+pub struct PostFilter {
+    pub status: Option<PostStatus>,
+    pub author_id: Option<UserId>,
+}
+
 // Pagination
 #[derive(Debug, Clone, Default)]
 pub struct Pagination {

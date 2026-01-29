@@ -29,13 +29,10 @@ pub trait CommentRepository: Send + Sync {
     async fn create(&self, comment: Comment) -> Comment;
 }
 
-// Filter Types
-#[derive(Debug, Clone, Default)]
-pub struct PostFilter {
-    pub status: Option<PostStatus>,
-    pub author_id: Option<UserId>,
-}
+// Re-export from domain
+pub use crate::domain::PostFilter;
 
+// Update Types
 #[derive(Debug, Clone, Default)]
 pub struct PostUpdate {
     pub title: Option<String>,

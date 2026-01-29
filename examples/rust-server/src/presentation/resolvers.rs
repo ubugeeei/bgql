@@ -4,7 +4,8 @@ use crate::application::*;
 use crate::generated::*;
 use crate::infrastructure::*;
 use async_trait::async_trait;
-use bgql_sdk::server::{Context, SdkResult};
+use bgql_sdk::server::Context;
+use bgql_sdk::SdkResult;
 use serde_json::json;
 use std::sync::Arc;
 

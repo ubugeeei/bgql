@@ -220,81 +220,72 @@ pub(crate) async fn run_server(server: Arc<BgqlServer>) -> SdkResult<()> {
     }
     println!();
 
+    // Process requests sequentially to avoid Send requirement on BgqlServer
+    // TODO: Make BgqlServer Send+Sync for parallel request processing
     loop {
         let (stream, _addr) = listener
             .accept()
             .await
             .map_err(|e| crate::error::SdkError::server(format!("Failed to accept: {}", e)))?;
 
-        let server = server.clone();
+        let io = TokioIo::new(stream);
+        let server_ref = &server;
 
-        tokio::spawn(async move {
-            let io = TokioIo::new(stream);
+        let service = service_fn(|req: Request<Incoming>| {
+            let config = server_ref.config();
+            async move {
+                let (parts, body) = req.into_parts();
 
-            let service = service_fn(move |req: Request<Incoming>| {
-                let server = server.clone();
-                async move {
-                    let config = server.config();
-                    let (parts, body) = req.into_parts();
+                let response: Response<BoxBody> = match (parts.method.clone(), parts.uri.path()) {
+                    (Method::GET, "/health") => Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", "application/json")
+                        .body(full(health_response()))
+                        .unwrap(),
 
-                    let response: Response<BoxBody> = match (parts.method.clone(), parts.uri.path())
-                    {
-                        (Method::GET, "/health") => Response::builder()
+                    (Method::GET, "/.well-known/bgql") => Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", "application/json")
+                        .body(full(well_known_bgql(config)))
+                        .unwrap(),
+
+                    (Method::POST, "/bgql") => {
+                        let body_bytes =
+                            body.collect().await.map(|c| c.to_bytes()).unwrap_or_default();
+                        handle_graphql_request(body_bytes, server_ref).await
+                    }
+
+                    (Method::GET, "/bgql") | (Method::GET, "/") if config.playground => {
+                        Response::builder()
                             .status(StatusCode::OK)
-                            .header("Content-Type", "application/json")
-                            .body(full(health_response()))
-                            .unwrap(),
+                            .header("Content-Type", "text/html; charset=utf-8")
+                            .body(full(playground_html("/bgql")))
+                            .unwrap()
+                    }
 
-                        (Method::GET, "/.well-known/bgql") => Response::builder()
-                            .status(StatusCode::OK)
-                            .header("Content-Type", "application/json")
-                            .body(full(well_known_bgql(config)))
-                            .unwrap(),
+                    (Method::OPTIONS, "/bgql") => Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Access-Control-Allow-Origin", "*")
+                        .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                        .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+                        .body(full(""))
+                        .unwrap(),
 
-                        (Method::POST, "/bgql") => {
-                            let body_bytes = body
-                                .collect()
-                                .await
-                                .map(|c| c.to_bytes())
-                                .unwrap_or_default();
-                            handle_graphql_request(body_bytes, &server).await
-                        }
+                    _ => Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .header("Content-Type", "application/json")
+                        .body(full(r#"{"error":"Not Found"}"#))
+                        .unwrap(),
+                };
 
-                        (Method::GET, "/bgql") | (Method::GET, "/") if config.playground => {
-                            Response::builder()
-                                .status(StatusCode::OK)
-                                .header("Content-Type", "text/html; charset=utf-8")
-                                .body(full(playground_html("/bgql")))
-                                .unwrap()
-                        }
-
-                        (Method::OPTIONS, "/bgql") => Response::builder()
-                            .status(StatusCode::OK)
-                            .header("Access-Control-Allow-Origin", "*")
-                            .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                            .header(
-                                "Access-Control-Allow-Headers",
-                                "Content-Type, Authorization",
-                            )
-                            .body(full(""))
-                            .unwrap(),
-
-                        _ => Response::builder()
-                            .status(StatusCode::NOT_FOUND)
-                            .header("Content-Type", "application/json")
-                            .body(full(r#"{"error":"Not Found"}"#))
-                            .unwrap(),
-                    };
-
-                    Ok::<_, Infallible>(response)
-                }
-            });
-
-            if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
-                if !err.to_string().contains("connection closed") {
-                    error!("Connection error: {:?}", err);
-                }
+                Ok::<_, Infallible>(response)
             }
         });
+
+        if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+            if !err.to_string().contains("connection closed") {
+                error!("Connection error: {:?}", err);
+            }
+        }
     }
 }

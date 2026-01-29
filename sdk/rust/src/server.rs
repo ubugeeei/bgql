@@ -230,64 +230,6 @@ pub struct ServerBuilder {
     interner: Interner,
 }
 
-/// Server builder with shared state.
-pub struct StatefulServerBuilder<S: Clone + Send + Sync + 'static> {
-    inner: ServerBuilder,
-    state: Arc<S>,
-}
-
-impl<S: Clone + Send + Sync + 'static> StatefulServerBuilder<S> {
-    /// Adds a resolver with automatic state cloning.
-    pub fn resolver<F, Fut>(
-        mut self,
-        type_name: impl Into<String>,
-        field_name: impl Into<String>,
-        func: F,
-    ) -> Self
-    where
-        F: Fn(Arc<S>, serde_json::Value, Context) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = SdkResult<serde_json::Value>> + Send + 'static,
-    {
-        let state = self.state.clone();
-        let type_name = type_name.into();
-        let field_name = field_name.into();
-
-        self.inner.resolvers.push(Resolver {
-            type_name,
-            field_name,
-            func: Arc::new(move |args, ctx| {
-                let s = state.clone();
-                let f = func;
-                Box::pin(async move { f(s, args, ctx).await })
-            }),
-        });
-        self
-    }
-
-    /// Sets the configuration.
-    pub fn config(mut self, config: ServerConfig) -> Self {
-        self.inner.config = config;
-        self
-    }
-
-    /// Sets the schema from SDL.
-    pub fn schema_sdl(mut self, sdl: impl Into<String>) -> Self {
-        self.inner.sdl = Some(sdl.into());
-        self
-    }
-
-    /// Sets the schema from a file path.
-    pub fn schema_file(mut self, path: impl Into<String>) -> Self {
-        self.inner = self.inner.schema_file(path);
-        self
-    }
-
-    /// Builds the server.
-    pub fn build(self) -> SdkResult<BgqlServer> {
-        self.inner.build()
-    }
-}
-
 impl ServerBuilder {
     /// Creates a new builder.
     pub fn new() -> Self {
