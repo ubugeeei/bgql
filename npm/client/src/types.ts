@@ -480,3 +480,450 @@ export function extractNodes<T>(connection: Connection<T>): T[] {
 export function unwrapNullable<T>(value: T | null | undefined): T | undefined {
   return value ?? undefined;
 }
+
+// =============================================================================
+// Strict Type Inference - Advanced Type Utilities
+// =============================================================================
+
+/**
+ * DeepReadonly - Makes all nested properties readonly.
+ * Useful for immutable result data from queries.
+ */
+export type DeepReadonly<T> = T extends (infer U)[]
+  ? DeepReadonlyArray<U>
+  : T extends object
+    ? DeepReadonlyObject<T>
+    : T;
+
+type DeepReadonlyArray<T> = ReadonlyArray<DeepReadonly<T>>;
+type DeepReadonlyObject<T> = { readonly [K in keyof T]: DeepReadonly<T[K]> };
+
+/**
+ * Exact type - Ensures no extra properties are passed.
+ * Prevents typos and invalid field access.
+ *
+ * @example
+ * ```typescript
+ * type User = { id: string; name: string };
+ * const user: Exact<User> = { id: '1', name: 'John', typo: 'x' };
+ * //                                               ^^ Error!
+ * ```
+ */
+export type Exact<T, U extends T = T> = T extends object
+  ? U extends T
+    ? { [K in keyof U]: K extends keyof T ? Exact<T[K], U[K]> : never }
+    : T
+  : T;
+
+/**
+ * StrictOmit - Like Omit but enforces that keys exist.
+ */
+export type StrictOmit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+
+/**
+ * StrictPick - Like Pick but enforces that keys exist.
+ */
+export type StrictPick<T, K extends keyof T> = Pick<T, K>;
+
+/**
+ * RequireAtLeastOne - Requires at least one of the specified keys.
+ */
+export type RequireAtLeastOne<T, Keys extends keyof T = keyof T> = Pick<
+  T,
+  Exclude<keyof T, Keys>
+> &
+  { [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>> }[Keys];
+
+/**
+ * RequireOnlyOne - Requires exactly one of the specified keys.
+ */
+export type RequireOnlyOne<T, Keys extends keyof T = keyof T> = Pick<
+  T,
+  Exclude<keyof T, Keys>
+> &
+  {
+    [K in Keys]-?: Required<Pick<T, K>> &
+      Partial<Record<Exclude<Keys, K>, undefined>>;
+  }[Keys];
+
+// =============================================================================
+// Union Discrimination - Type-Safe Result Pattern
+// =============================================================================
+
+/**
+ * Discriminated union helper for __typename.
+ * Enables exhaustive type narrowing.
+ *
+ * @example
+ * ```typescript
+ * type UserResult =
+ *   | Discriminated<'User', { id: string; name: string }>
+ *   | Discriminated<'NotFoundError', { message: string }>;
+ *
+ * function handleResult(result: UserResult) {
+ *   switch (result.__typename) {
+ *     case 'User':
+ *       console.log(result.name); // Typed!
+ *       break;
+ *     case 'NotFoundError':
+ *       console.log(result.message); // Typed!
+ *       break;
+ *     default:
+ *       assertNever(result); // Ensures exhaustive
+ *   }
+ * }
+ * ```
+ */
+export type Discriminated<TTypename extends string, TFields> = {
+  readonly __typename: TTypename;
+} & TFields;
+
+/**
+ * Union type with __typename discrimination.
+ * Use this for GraphQL union/interface results.
+ */
+export type DiscriminatedUnion<T extends { __typename: string }> = T;
+
+/**
+ * Extracts a specific member from a discriminated union.
+ */
+export type ExtractUnionMember<
+  TUnion extends { __typename: string },
+  TTypename extends TUnion['__typename'],
+> = Extract<TUnion, { __typename: TTypename }>;
+
+/**
+ * Creates a type guard for a discriminated union member.
+ */
+export function isTypename<
+  T extends { __typename: string },
+  K extends T['__typename'],
+>(typename: K) {
+  return (value: T): value is Extract<T, { __typename: K }> =>
+    value.__typename === typename;
+}
+
+/**
+ * Asserts that a value is never reached (for exhaustive checks).
+ */
+export function assertNever(value: never, message?: string): never {
+  throw new Error(message ?? `Unexpected value: ${JSON.stringify(value)}`);
+}
+
+/**
+ * Match expression for discriminated unions.
+ * Provides exhaustive pattern matching.
+ *
+ * @example
+ * ```typescript
+ * const result: UserResult = await client.getUser({ id: '1' });
+ *
+ * const message = matchUnion(result, {
+ *   User: (user) => `Hello, ${user.name}!`,
+ *   NotFoundError: (err) => `Error: ${err.message}`,
+ *   ValidationError: (err) => `Invalid: ${err.field}`,
+ * });
+ * ```
+ */
+export function matchUnion<
+  T extends { __typename: string },
+  R,
+  Handlers extends { [K in T['__typename']]: (value: Extract<T, { __typename: K }>) => R },
+>(value: T, handlers: Handlers): R {
+  const handler = handlers[value.__typename as keyof Handlers];
+  if (!handler) {
+    throw new Error(`No handler for type: ${value.__typename}`);
+  }
+  return handler(value as never);
+}
+
+/**
+ * Partial match with fallback.
+ */
+export function matchUnionPartial<
+  T extends { __typename: string },
+  R,
+  Handlers extends Partial<{ [K in T['__typename']]: (value: Extract<T, { __typename: K }>) => R }>,
+>(value: T, handlers: Handlers, fallback: (value: T) => R): R {
+  const handler = handlers[value.__typename as keyof Handlers];
+  if (handler) {
+    return handler(value as never);
+  }
+  return fallback(value);
+}
+
+// =============================================================================
+// Result Type Pattern - Type-Safe Error Handling
+// =============================================================================
+
+/**
+ * Success result wrapper.
+ */
+export interface Success<T> {
+  readonly ok: true;
+  readonly value: T;
+  readonly error?: undefined;
+}
+
+/**
+ * Failure result wrapper.
+ */
+export interface Failure<E> {
+  readonly ok: false;
+  readonly value?: undefined;
+  readonly error: E;
+}
+
+/**
+ * Result type for type-safe error handling.
+ */
+export type Result<T, E = Error> = Success<T> | Failure<E>;
+
+/**
+ * Creates a success result.
+ */
+export function ok<T>(value: T): Success<T> {
+  return { ok: true, value };
+}
+
+/**
+ * Creates a failure result.
+ */
+export function err<E>(error: E): Failure<E> {
+  return { ok: false, error };
+}
+
+/**
+ * Checks if a result is a success.
+ */
+export function isOk<T, E>(result: Result<T, E>): result is Success<T> {
+  return result.ok;
+}
+
+/**
+ * Checks if a result is a failure.
+ */
+export function isErr<T, E>(result: Result<T, E>): result is Failure<E> {
+  return !result.ok;
+}
+
+/**
+ * Maps a successful result.
+ */
+export function mapResult<T, U, E>(
+  result: Result<T, E>,
+  fn: (value: T) => U
+): Result<U, E> {
+  return result.ok ? ok(fn(result.value)) : result;
+}
+
+/**
+ * Maps an error result.
+ */
+export function mapError<T, E, F>(
+  result: Result<T, E>,
+  fn: (error: E) => F
+): Result<T, F> {
+  return result.ok ? result : err(fn(result.error));
+}
+
+/**
+ * Unwraps a result, throwing on error.
+ */
+export function unwrap<T, E>(result: Result<T, E>): T {
+  if (result.ok) return result.value;
+  throw result.error instanceof Error ? result.error : new Error(String(result.error));
+}
+
+/**
+ * Unwraps a result with a default value on error.
+ */
+export function unwrapOr<T, E>(result: Result<T, E>, defaultValue: T): T {
+  return result.ok ? result.value : defaultValue;
+}
+
+// =============================================================================
+// Operation Types - Strict Query/Mutation Typing
+// =============================================================================
+
+/**
+ * Query operation marker type.
+ */
+export interface QueryOperation<TData, TVariables> extends TypedDocumentNode<TData, TVariables> {
+  readonly __operationType: 'query';
+}
+
+/**
+ * Mutation operation marker type.
+ */
+export interface MutationOperation<TData, TVariables> extends TypedDocumentNode<TData, TVariables> {
+  readonly __operationType: 'mutation';
+}
+
+/**
+ * Subscription operation marker type.
+ */
+export interface SubscriptionOperation<TData, TVariables> extends TypedDocumentNode<TData, TVariables> {
+  readonly __operationType: 'subscription';
+}
+
+/**
+ * Any operation type.
+ */
+export type AnyOperation<TData = unknown, TVariables = unknown> =
+  | QueryOperation<TData, TVariables>
+  | MutationOperation<TData, TVariables>
+  | SubscriptionOperation<TData, TVariables>;
+
+/**
+ * Infers the operation type from a document.
+ */
+export type OperationTypeOf<T> = T extends { __operationType: infer O } ? O : never;
+
+// =============================================================================
+// Fragment Types - Type-Safe Fragment Usage
+// =============================================================================
+
+/**
+ * Fragment definition with type information.
+ */
+export interface FragmentDefinition<TData, TTypename extends string = string> {
+  readonly __fragmentType: TTypename;
+  readonly __fragmentData?: TData;
+}
+
+/**
+ * Extracts data type from a fragment definition.
+ */
+export type FragmentDataOf<T> = T extends FragmentDefinition<infer TData, string>
+  ? TData
+  : never;
+
+/**
+ * Makes a type require a fragment's fields.
+ */
+export type WithFragment<T, F extends FragmentDefinition<unknown>> = T &
+  FragmentDataOf<F>;
+
+/**
+ * Creates a fragment ref for type-safe fragment spreading.
+ */
+export type FragmentRef<TData> = {
+  readonly ' $fragmentData'?: TData;
+};
+
+/**
+ * Masks fragment data (for data masking).
+ */
+export type MaskedFragment<T> = {
+  readonly ' $fragmentData': T;
+};
+
+/**
+ * Unmasks a masked fragment.
+ */
+export function unmask<T>(fragment: MaskedFragment<T>): T {
+  return fragment as unknown as T;
+}
+
+// =============================================================================
+// Scalar Types - Custom Scalar Mapping
+// =============================================================================
+
+/**
+ * Default scalar type mapping.
+ */
+export interface ScalarTypes {
+  ID: string;
+  String: string;
+  Int: number;
+  Float: number;
+  Boolean: boolean;
+  DateTime: string;
+  Date: string;
+  Time: string;
+  JSON: unknown;
+  UUID: string;
+  BigInt: bigint | string;
+  Decimal: string;
+  URL: string;
+  Email: string;
+}
+
+/**
+ * Resolves a scalar type name to its TypeScript type.
+ */
+export type ResolveScalar<T extends keyof ScalarTypes> = ScalarTypes[T];
+
+/**
+ * Allows customizing scalar types per-project.
+ */
+export interface CustomScalars {}
+
+/**
+ * Merged scalar types (custom overrides default).
+ */
+export type MergedScalars = CustomScalars & ScalarTypes;
+
+// =============================================================================
+// Input Types - Strict Input Validation
+// =============================================================================
+
+/**
+ * NoExcessProperties - Prevents extra properties on input types.
+ * Useful for catching typos in variables.
+ */
+export type NoExcessProperties<T, U extends T> = U & {
+  [K in Exclude<keyof U, keyof T>]: never;
+};
+
+/**
+ * Strict input type - requires all non-optional fields.
+ */
+export type StrictInput<T> = {
+  [K in keyof T as undefined extends T[K] ? never : K]-?: T[K];
+} & {
+  [K in keyof T as undefined extends T[K] ? K : never]?: T[K];
+};
+
+/**
+ * Input type with explicit undefined for optional fields.
+ */
+export type ExplicitOptional<T> = {
+  [K in keyof T]: T[K] | undefined;
+};
+
+// =============================================================================
+// Inference Helpers - Extract Types from Operations
+// =============================================================================
+
+/**
+ * Extracts the return type of a query field.
+ */
+export type QueryFieldResult<
+  TQuery extends TypedDocumentNode<unknown, unknown>,
+  TField extends keyof NonNullable<ResultOf<TQuery>>,
+> = NonNullable<ResultOf<TQuery>>[TField];
+
+/**
+ * Extracts a deeply nested field type.
+ */
+export type DeepFieldResult<T, K extends string> = K extends `${infer First}.${infer Rest}`
+  ? First extends keyof T
+    ? DeepFieldResult<NonNullable<T[First]>, Rest>
+    : never
+  : K extends keyof T
+    ? T[K]
+    : never;
+
+/**
+ * Makes array fields non-null in the result.
+ */
+export type NonNullableArrayElements<T> = T extends (infer U)[]
+  ? NonNullable<U>[]
+  : T;
+
+/**
+ * Unwraps connection type to array of nodes.
+ */
+export type UnwrapConnection<T> = T extends Connection<infer U> ? U[] : T;

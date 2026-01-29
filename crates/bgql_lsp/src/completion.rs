@@ -463,6 +463,156 @@ fn directive_completions(document: &Document<'_>, interner: &Interner) -> Vec<Co
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
         },
+        // Streaming directives
+        CompletionItem {
+            label: "defer".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Defer field resolution".to_string()),
+            insert_text: Some("defer(label: \"${0:label}\")".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "stream".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Stream list items incrementally".to_string()),
+            insert_text: Some("stream(initialCount: ${0:10})".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        // Validation directives
+        CompletionItem {
+            label: "minLength".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Minimum string length validation".to_string()),
+            insert_text: Some("minLength(${0:1})".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "maxLength".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Maximum string length validation".to_string()),
+            insert_text: Some("maxLength(${0:100})".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "min".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Minimum numeric value validation".to_string()),
+            insert_text: Some("min(${0:0})".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "max".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Maximum numeric value validation".to_string()),
+            insert_text: Some("max(${0:100})".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "pattern".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Regex pattern validation".to_string()),
+            insert_text: Some("pattern(regex: \"${0:^[a-z]+$}\")".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "email".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Email format validation".to_string()),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "url".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("URL format validation".to_string()),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "uuid".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("UUID format validation".to_string()),
+            ..Default::default()
+        },
+        // Authorization directives
+        CompletionItem {
+            label: "requireAuth".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Require authentication".to_string()),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "hasRole".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Require specific role".to_string()),
+            insert_text: Some("hasRole(role: ${0:ADMIN})".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "hasPermission".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Require specific permission".to_string()),
+            insert_text: Some("hasPermission(permission: \"${0:read:users}\")".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        // Caching directives
+        CompletionItem {
+            label: "cacheControl".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Set cache control hints".to_string()),
+            insert_text: Some("cacheControl(maxAge: ${0:60})".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        // Rate limiting
+        CompletionItem {
+            label: "rateLimit".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Apply rate limiting".to_string()),
+            insert_text: Some("rateLimit(requests: ${1:100}, window: \"${0:1h}\")".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        // Complexity
+        CompletionItem {
+            label: "complexity".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Set query complexity cost".to_string()),
+            insert_text: Some("complexity(${0:1})".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        // Documentation
+        CompletionItem {
+            label: "specifiedBy".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Specify scalar specification URL".to_string()),
+            insert_text: Some("specifiedBy(url: \"${0:https://...}\")".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
+        // Server-side fragments
+        CompletionItem {
+            label: "server".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Mark as server-side fragment".to_string()),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "use".to_string(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("Use a server-side fragment".to_string()),
+            insert_text: Some("use(fragment: \"${0:FragmentName}\")".to_string()),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        },
     ];
 
     // User-defined directives

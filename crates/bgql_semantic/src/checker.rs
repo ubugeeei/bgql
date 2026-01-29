@@ -57,6 +57,14 @@ pub struct TypeChecker<'a> {
     type_implements: FxHashMap<String, FxHashSet<String>>,
     /// Type parameters currently in scope (for checking generic type bodies)
     type_params_in_scope: FxHashSet<String>,
+    /// Type dependency graph for cycle detection
+    type_dependencies: FxHashMap<String, FxHashSet<String>>,
+    /// Set of deprecated types for warning when used
+    deprecated_types: FxHashSet<String>,
+    /// Type locations for better error messages
+    type_locations: FxHashMap<String, bgql_core::Span>,
+    /// Enable strict mode (treat some warnings as errors)
+    strict_mode: bool,
 }
 
 /// Result of type checking.
@@ -86,7 +94,22 @@ impl<'a> TypeChecker<'a> {
             generic_types: FxHashMap::default(),
             type_implements: FxHashMap::default(),
             type_params_in_scope: FxHashSet::default(),
+            type_dependencies: FxHashMap::default(),
+            deprecated_types: FxHashSet::default(),
+            type_locations: FxHashMap::default(),
+            strict_mode: false,
         }
+    }
+
+    /// Creates a new type checker with strict mode enabled.
+    pub fn new_strict(
+        types: &'a TypeRegistry,
+        hir: &'a HirDatabase,
+        interner: &'a Interner,
+    ) -> Self {
+        let mut checker = Self::new(types, hir, interner);
+        checker.strict_mode = true;
+        checker
     }
 
     /// Resolves a Text to a String.
@@ -162,11 +185,260 @@ impl<'a> TypeChecker<'a> {
         // Phase 1: Collect all type definitions
         self.collect_type_definitions(document);
 
-        // Phase 2: Check all type references and semantic rules
+        // Phase 2: Build type dependency graph
+        self.build_dependency_graph(document);
+
+        // Phase 3: Check for cyclic type references
+        self.check_cycles();
+
+        // Phase 4: Check all type references and semantic rules
         self.check_definitions(document);
+
+        // Phase 5: Naming convention warnings (if not strict mode)
+        self.check_naming_conventions(document);
 
         CheckResult {
             diagnostics: std::mem::take(&mut self.diagnostics),
+        }
+    }
+
+    /// Builds the type dependency graph.
+    fn build_dependency_graph(&mut self, document: &Document<'_>) {
+        for definition in &document.definitions {
+            if let Definition::Type(type_def) = definition {
+                let type_name = match type_def {
+                    TypeDefinition::Object(obj) => self.resolve(obj.name.value),
+                    TypeDefinition::Interface(iface) => self.resolve(iface.name.value),
+                    TypeDefinition::Input(input) => self.resolve(input.name.value),
+                    TypeDefinition::InputEnum(ie) => self.resolve(ie.name.value),
+                    // Other types (enum, union, scalar, etc.) don't create problematic cycles
+                    _ => continue,
+                };
+
+                let mut deps = FxHashSet::default();
+
+                match type_def {
+                    TypeDefinition::Object(obj) => {
+                        for field in &obj.fields {
+                            self.collect_type_deps(&field.ty, &mut deps);
+                        }
+                    }
+                    TypeDefinition::Interface(iface) => {
+                        for field in &iface.fields {
+                            self.collect_type_deps(&field.ty, &mut deps);
+                        }
+                    }
+                    TypeDefinition::Input(input) => {
+                        for field in &input.fields {
+                            self.collect_type_deps(&field.ty, &mut deps);
+                        }
+                    }
+                    TypeDefinition::InputEnum(ie) => {
+                        for variant in &ie.variants {
+                            if let Some(fields) = &variant.fields {
+                                for field in fields {
+                                    self.collect_type_deps(&field.ty, &mut deps);
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                self.type_dependencies.insert(type_name, deps);
+            }
+        }
+    }
+
+    /// Collects type dependencies from a type reference.
+    /// Only collects non-nullable (required) dependencies for cycle detection.
+    fn collect_type_deps(&self, ty: &Type<'_>, deps: &mut FxHashSet<String>) {
+        match ty {
+            Type::Named(named) => {
+                let name = self.interner.get(named.name);
+                // Skip built-in types
+                if !["Int", "Float", "String", "Boolean", "ID", "Option", "List"]
+                    .contains(&name.as_str())
+                {
+                    deps.insert(name);
+                }
+            }
+            // Option and List break the cycle because they can be null/empty
+            Type::Option(_, _) | Type::List(_, _) => {
+                // Don't add to deps - these are nullable/breakable
+            }
+            Type::Generic(generic) => {
+                let name = self.interner.get(generic.name);
+                // Option<T> and List<T> are breakable
+                if ["Option", "List"].contains(&name.as_str()) {
+                    // Skip - these don't create non-nullable cycles
+                    return;
+                }
+                deps.insert(name);
+                for arg in &generic.arguments {
+                    self.collect_type_deps(arg, deps);
+                }
+            }
+            Type::Tuple(tuple) => {
+                for elem in &tuple.elements {
+                    self.collect_type_deps(&elem.ty, deps);
+                }
+            }
+            Type::_Phantom(_) => {}
+        }
+    }
+
+    /// Checks for cyclic type references (non-nullable cycles are errors).
+    fn check_cycles(&mut self) {
+        // Simple DFS-based cycle detection
+        let types: Vec<_> = self.type_dependencies.keys().cloned().collect();
+
+        for start_type in &types {
+            let mut visited = FxHashSet::default();
+            let mut path = Vec::new();
+
+            if self.has_non_nullable_cycle(start_type, &mut visited, &mut path) {
+                // Only report if we haven't already
+                let cycle_str = path.join(" -> ");
+                if let Some(span) = self.type_locations.get(start_type).copied() {
+                    self.diagnostics.error(
+                        codes::CYCLIC_TYPE_REFERENCE,
+                        format!("Cyclic type reference detected: {}", cycle_str),
+                        span,
+                        "Types cannot form non-nullable cycles (use Option<T> to break the cycle)",
+                    );
+                }
+            }
+        }
+    }
+
+    /// Checks if there's a non-nullable cycle starting from a type.
+    fn has_non_nullable_cycle(
+        &self,
+        current: &str,
+        visited: &mut FxHashSet<String>,
+        path: &mut Vec<String>,
+    ) -> bool {
+        if path.contains(&current.to_string()) {
+            path.push(current.to_string());
+            return true;
+        }
+
+        if visited.contains(current) {
+            return false;
+        }
+
+        visited.insert(current.to_string());
+        path.push(current.to_string());
+
+        if let Some(deps) = self.type_dependencies.get(current) {
+            for dep in deps {
+                if self.has_non_nullable_cycle(dep, visited, path) {
+                    return true;
+                }
+            }
+        }
+
+        path.pop();
+        false
+    }
+
+    /// Checks naming conventions and emits warnings.
+    fn check_naming_conventions(&mut self, document: &Document<'_>) {
+        for definition in &document.definitions {
+            if let Definition::Type(type_def) = definition {
+                let (name, span) = match type_def {
+                    TypeDefinition::Object(obj) => (self.resolve(obj.name.value), obj.name.span),
+                    TypeDefinition::Interface(iface) => {
+                        (self.resolve(iface.name.value), iface.name.span)
+                    }
+                    TypeDefinition::Enum(e) => (self.resolve(e.name.value), e.name.span),
+                    TypeDefinition::Union(u) => (self.resolve(u.name.value), u.name.span),
+                    TypeDefinition::Input(i) => (self.resolve(i.name.value), i.name.span),
+                    TypeDefinition::Scalar(s) => (self.resolve(s.name.value), s.name.span),
+                    TypeDefinition::Opaque(o) => (self.resolve(o.name.value), o.name.span),
+                    TypeDefinition::InputEnum(ie) => (self.resolve(ie.name.value), ie.name.span),
+                    TypeDefinition::InputUnion(iu) => (self.resolve(iu.name.value), iu.name.span),
+                    TypeDefinition::TypeAlias(ta) => (self.resolve(ta.name.value), ta.name.span),
+                };
+
+                // Type names should be PascalCase
+                if !name.is_empty() {
+                    let first_char = name.chars().next().unwrap();
+                    if !first_char.is_uppercase() {
+                        self.diagnostics.warning(
+                            codes::NAMING_CONVENTION,
+                            format!("Type name `{}` should be PascalCase", name),
+                            span,
+                            "Type names should start with an uppercase letter",
+                        );
+                    }
+                }
+
+                // Check field naming conventions
+                match type_def {
+                    TypeDefinition::Object(obj) => {
+                        for field in &obj.fields {
+                            let field_name = self.resolve(field.name.value);
+                            if !field_name.is_empty() {
+                                let first_char = field_name.chars().next().unwrap();
+                                if first_char.is_uppercase() {
+                                    self.diagnostics.warning(
+                                        codes::NAMING_CONVENTION,
+                                        format!("Field name `{}` should be camelCase", field_name),
+                                        field.name.span,
+                                        "Field names should start with a lowercase letter",
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    TypeDefinition::Interface(iface) => {
+                        for field in &iface.fields {
+                            let field_name = self.resolve(field.name.value);
+                            if !field_name.is_empty() {
+                                let first_char = field_name.chars().next().unwrap();
+                                if first_char.is_uppercase() {
+                                    self.diagnostics.warning(
+                                        codes::NAMING_CONVENTION,
+                                        format!("Field name `{}` should be camelCase", field_name),
+                                        field.name.span,
+                                        "Field names should start with a lowercase letter",
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    TypeDefinition::Enum(e) => {
+                        // Enum values should be SCREAMING_SNAKE_CASE or PascalCase
+                        for value in &e.values {
+                            let value_name = self.resolve(value.name.value);
+                            // Allow both SCREAMING_SNAKE_CASE and PascalCase
+                            let is_screaming = value_name
+                                .chars()
+                                .all(|c| c.is_uppercase() || c == '_' || c.is_numeric());
+                            let is_pascal = value_name
+                                .chars()
+                                .next()
+                                .map(|c| c.is_uppercase())
+                                .unwrap_or(false);
+
+                            if !is_screaming && !is_pascal {
+                                self.diagnostics.warning(
+                                    codes::NAMING_CONVENTION,
+                                    format!(
+                                        "Enum value `{}` should be SCREAMING_SNAKE_CASE or PascalCase",
+                                        value_name
+                                    ),
+                                    value.name.span,
+                                    "Enum values should be uppercase or PascalCase",
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -216,27 +488,31 @@ impl<'a> TypeChecker<'a> {
                         }
                     };
 
+                    // Get the span for this type definition
+                    let type_span = match type_def {
+                        TypeDefinition::Object(obj) => obj.name.span,
+                        TypeDefinition::Interface(iface) => iface.name.span,
+                        TypeDefinition::Union(union_def) => union_def.name.span,
+                        TypeDefinition::Enum(enum_def) => enum_def.name.span,
+                        TypeDefinition::Input(input) => input.name.span,
+                        TypeDefinition::Scalar(scalar) => scalar.name.span,
+                        TypeDefinition::Opaque(opaque) => opaque.name.span,
+                        TypeDefinition::TypeAlias(alias) => alias.name.span,
+                        TypeDefinition::InputUnion(input_union) => input_union.name.span,
+                        TypeDefinition::InputEnum(input_enum) => input_enum.name.span,
+                    };
+
                     // Check for duplicate type definitions
                     if self.defined_types.contains(&name) {
-                        let span = match type_def {
-                            TypeDefinition::Object(obj) => obj.name.span,
-                            TypeDefinition::Interface(iface) => iface.name.span,
-                            TypeDefinition::Union(union_def) => union_def.name.span,
-                            TypeDefinition::Enum(enum_def) => enum_def.name.span,
-                            TypeDefinition::Input(input) => input.name.span,
-                            TypeDefinition::Scalar(scalar) => scalar.name.span,
-                            TypeDefinition::Opaque(opaque) => opaque.name.span,
-                            TypeDefinition::TypeAlias(alias) => alias.name.span,
-                            TypeDefinition::InputUnion(input_union) => input_union.name.span,
-                            TypeDefinition::InputEnum(input_enum) => input_enum.name.span,
-                        };
                         self.diagnostics.error(
                             codes::DUPLICATE_TYPE,
                             format!("Duplicate type definition `{name}`"),
-                            span,
+                            type_span,
                             format!("Type `{name}` is already defined"),
                         );
                     } else {
+                        // Store the location for better error messages
+                        self.type_locations.insert(name.clone(), type_span);
                         self.defined_types.insert(name.clone());
                         if is_interface {
                             self.interfaces.insert(name.clone());

@@ -3,6 +3,9 @@
 //! # Usage
 //!
 //! ```bash
+//! # Initialize a new project
+//! bgql init my-api
+//!
 //! # Validate a schema
 //! bgql check schema.bgql
 //!
@@ -12,14 +15,24 @@
 //! # Generate TypeScript types
 //! bgql codegen --lang typescript schema.bgql
 //!
+//! # Start the development server
+//! bgql dev
+//!
+//! # Build for production
+//! bgql build
+//!
+//! # Watch for changes
+//! bgql watch
+//!
 //! # Start the language server
 //! bgql lsp
 //! ```
 
 use bgql_core::Interner;
 use bgql_syntax::{parse, FormatOptions};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -36,15 +49,61 @@ pub struct Cli {
     pub command: Commands,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum ProjectTemplate {
+    /// Minimal project with basic schema
+    Minimal,
+    /// Full-stack project with server and client
+    Fullstack,
+    /// Server-only project
+    Server,
+    /// API-first project with OpenAPI integration
+    Api,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum CodegenLanguage {
+    Typescript,
+    Rust,
+    Go,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    /// Initialize a new Better GraphQL project
+    Init {
+        /// Project name
+        name: String,
+
+        /// Project template
+        #[arg(short, long, value_enum, default_value = "minimal")]
+        template: ProjectTemplate,
+
+        /// Use TypeScript (for Node.js projects)
+        #[arg(long)]
+        typescript: bool,
+
+        /// Skip git initialization
+        #[arg(long)]
+        no_git: bool,
+    },
+
     /// Check GraphQL files for errors
     Check {
         #[arg(required = true)]
         files: Vec<PathBuf>,
 
+        /// Enable strict mode (treat warnings as errors)
         #[arg(long)]
         strict: bool,
+
+        /// Check query complexity
+        #[arg(long)]
+        complexity: bool,
+
+        /// Maximum allowed query depth
+        #[arg(long, default_value = "10")]
+        max_depth: usize,
     },
 
     /// Format GraphQL files
@@ -53,26 +112,93 @@ pub enum Commands {
         #[arg(required = true)]
         files: Vec<PathBuf>,
 
+        /// Check if files are formatted (don't modify)
         #[arg(long)]
         check: bool,
 
+        /// Indentation size
         #[arg(long, default_value = "2")]
         indent: usize,
 
+        /// Use tabs instead of spaces
         #[arg(long)]
         tabs: bool,
     },
 
     /// Generate code from GraphQL schema
     Codegen {
+        /// Schema file path
         #[arg(required = true)]
         schema: PathBuf,
 
+        /// Output file or directory
         #[arg(short, long)]
         output: Option<PathBuf>,
 
-        #[arg(short, long, default_value = "typescript")]
-        lang: String,
+        /// Target language
+        #[arg(short, long, value_enum, default_value = "typescript")]
+        lang: CodegenLanguage,
+
+        /// Watch for changes and regenerate
+        #[arg(short, long)]
+        watch: bool,
+    },
+
+    /// Start the development server
+    Dev {
+        /// Schema file path
+        #[arg(default_value = "schema.bgql")]
+        schema: PathBuf,
+
+        /// Port to listen on
+        #[arg(short, long, default_value = "4000")]
+        port: u16,
+
+        /// Host to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+
+        /// Enable GraphQL Playground
+        #[arg(long)]
+        playground: bool,
+
+        /// Enable hot reload
+        #[arg(long)]
+        hot_reload: bool,
+    },
+
+    /// Build schema for production
+    Build {
+        /// Schema file path
+        #[arg(default_value = "schema.bgql")]
+        schema: PathBuf,
+
+        /// Output directory
+        #[arg(short, long, default_value = "dist")]
+        output: PathBuf,
+
+        /// Minify output
+        #[arg(long)]
+        minify: bool,
+
+        /// Generate introspection schema
+        #[arg(long)]
+        introspection: bool,
+    },
+
+    /// Watch files and run commands on change
+    Watch {
+        /// Files or directories to watch
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        /// Command to run on change
+        #[arg(short, long, default_value = "check")]
+        command: String,
+
+        /// File extensions to watch
+        #[arg(short, long, default_value = "bgql,graphql")]
+        extensions: String,
     },
 
     /// Start the language server
@@ -80,8 +206,10 @@ pub enum Commands {
 
     /// Parse a GraphQL file and print the AST
     Parse {
+        /// File to parse
         file: PathBuf,
 
+        /// Output format (pretty, json, sexp)
         #[arg(long, default_value = "pretty")]
         format: String,
     },
@@ -92,7 +220,16 @@ pub enum Commands {
 
 pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
     match cli.command {
-        Commands::Check { files, strict } => check_files(&files, strict, cli.verbose),
+        Commands::Init { .. } => {
+            println!("Init command not yet implemented");
+            Ok(0)
+        }
+        Commands::Check {
+            files,
+            strict,
+            complexity: _,
+            max_depth: _,
+        } => check_files(&files, strict, cli.verbose),
         Commands::Fmt {
             files,
             check,
@@ -103,7 +240,27 @@ pub fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             schema,
             output,
             lang,
-        } => generate_code(&schema, output.as_ref(), &lang),
+            watch: _,
+        } => {
+            let lang_str = match lang {
+                CodegenLanguage::Typescript => "typescript",
+                CodegenLanguage::Rust => "rust",
+                CodegenLanguage::Go => "go",
+            };
+            generate_code(&schema, output.as_ref(), lang_str)
+        }
+        Commands::Dev { .. } => {
+            println!("Development server not yet implemented");
+            Ok(0)
+        }
+        Commands::Build { .. } => {
+            println!("Build command not yet implemented");
+            Ok(0)
+        }
+        Commands::Watch { .. } => {
+            println!("Watch command not yet implemented");
+            Ok(0)
+        }
         Commands::Lsp => {
             // Handled in main.rs
             Ok(0)

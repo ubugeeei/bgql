@@ -363,12 +363,13 @@ impl<'a> Parser<'a> {
 
     /// Peeks at the next token kind.
     fn peek_next(&mut self) -> TokenKind {
-        let _saved_pos = self.lexer.pos();
+        let saved_pos = self.lexer.pos();
         let saved_current = self.current;
         self.advance();
         let next = self.at();
-        // Restore - hacky but works
+        // Restore both the current token and lexer position
         self.current = saved_current;
+        self.lexer.set_pos(saved_pos);
         next
     }
 
