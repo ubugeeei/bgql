@@ -258,30 +258,30 @@ type alias CommentConnection = Connection<Comment>
 
 input CreateUserInput {
   email: String @email
-  password: String @minLength(8) @pattern(regex: "^(?=.*[A-Za-z])(?=.*\\d).+$")
-  name: String @minLength(1) @maxLength(100) @trim
+  password: String @minLength(value: 8) @pattern(regex: "^(?=.*[A-Za-z])(?=.*\\d).+$")
+  name: String @minLength(value: 1) @maxLength(value: 100) @trim
   role: UserRole = User
 }
 
 input UpdateUserInput {
-  name: Option<String> @minLength(1) @maxLength(100) @trim
-  bio: Option<String> @maxLength(500)
+  name: Option<String> @minLength(value: 1) @maxLength(value: 100) @trim
+  bio: Option<String> @maxLength(value: 500)
   avatarUrl: Option<String> @url
 }
 
 input CreatePostInput {
-  title: String @minLength(1) @maxLength(200) @trim
+  title: String @minLength(value: 1) @maxLength(value: 200) @trim
   content: HTML @sanitize(allowTags: ["p", "br", "b", "i", "a", "ul", "ol", "li", "h2", "h3", "blockquote", "pre", "code"])
-  excerpt: Option<String> @maxLength(500)
-  tags: List<TagId> @maxItems(10)
+  excerpt: Option<String> @maxLength(value: 500)
+  tags: List<TagId> @maxItems(value: 10)
   status: PostStatus = Draft
 }
 
 input UpdatePostInput {
-  title: Option<String> @minLength(1) @maxLength(200) @trim
+  title: Option<String> @minLength(value: 1) @maxLength(value: 200) @trim
   content: Option<HTML>
-  excerpt: Option<String> @maxLength(500)
-  tags: Option<List<TagId>> @maxItems(10)
+  excerpt: Option<String> @maxLength(value: 500)
+  tags: Option<List<TagId>> @maxItems(value: 10)
   status: Option<PostStatus>
 }
 
@@ -294,7 +294,7 @@ input CreateCommentInput {
 # Input Union for authentication
 input EmailCredentials {
   email: String @email
-  password: String @minLength(8)
+  password: String @minLength(value: 8)
 }
 
 input OAuthCredentials {
@@ -308,14 +308,14 @@ input union LoginCredentials = EmailCredentials | OAuthCredentials
 input UserFilter {
   role: Option<UserRole>
   isVerified: Option<Boolean>
-  search: Option<String> @maxLength(100)
+  search: Option<String> @maxLength(value: 100)
 }
 
 input PostFilter {
   status: Option<PostStatus>
   authorId: Option<UserId>
   tagIds: Option<List<TagId>>
-  search: Option<String> @maxLength(100)
+  search: Option<String> @maxLength(value: 100)
 }
 
 # =============================================================================
@@ -364,7 +364,7 @@ type Query {
   user(id: UserId): UserResult
 
   users(
-    first: Int = 10 @min(1) @max(100),
+    first: Int = 10 @min(value: 1) @max(value: 100),
     after: Option<String>,
     filter: Option<UserFilter>,
     orderBy: UserOrderBy = CreatedAtDesc
@@ -375,7 +375,7 @@ type Query {
   postBySlug(slug: String): PostResult
 
   posts(
-    first: Int = 10 @min(1) @max(100),
+    first: Int = 10 @min(value: 1) @max(value: 100),
     after: Option<String>,
     filter: Option<PostFilter>,
     orderBy: PostOrderBy = CreatedAtDesc
@@ -384,7 +384,7 @@ type Query {
   popularPosts(first: Int = 10): List<Post> @cache(maxAge: 3600, scope: Public)
 
   # Search
-  search(query: String @minLength(2), first: Int = 20): List<SearchResult>
+  search(query: String @minLength(value: 2), first: Int = 20): List<SearchResult>
 
   # Tags
   tags(first: Int = 50): List<Tag> @cache(maxAge: 3600, scope: Public)

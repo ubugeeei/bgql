@@ -59,8 +59,6 @@ pub struct TypeChecker<'a> {
     type_params_in_scope: FxHashSet<String>,
     /// Type dependency graph for cycle detection
     type_dependencies: FxHashMap<String, FxHashSet<String>>,
-    /// Set of deprecated types for warning when used
-    deprecated_types: FxHashSet<String>,
     /// Type locations for better error messages
     type_locations: FxHashMap<String, bgql_core::Span>,
     /// Enable strict mode (treat some warnings as errors)
@@ -95,7 +93,6 @@ impl<'a> TypeChecker<'a> {
             type_implements: FxHashMap::default(),
             type_params_in_scope: FxHashSet::default(),
             type_dependencies: FxHashMap::default(),
-            deprecated_types: FxHashSet::default(),
             type_locations: FxHashMap::default(),
             strict_mode: false,
         }
@@ -540,22 +537,30 @@ impl<'a> TypeChecker<'a> {
                             self.input_types.insert(name.clone());
                         }
 
-                        // Collect generic type parameters for object types
-                        if let TypeDefinition::Object(obj) = type_def {
-                            if !obj.type_params.is_empty() {
-                                let params = self.collect_type_params(&obj.type_params);
-                                self.generic_types
-                                    .insert(name.clone(), GenericTypeInfo { params });
+                        match type_def {
+                            TypeDefinition::Object(obj) => {
+                                if !obj.type_params.is_empty() {
+                                    let params = self.collect_type_params(&obj.type_params);
+                                    self.generic_types
+                                        .insert(name.clone(), GenericTypeInfo { params });
+                                }
+                                if !obj.implements.is_empty() {
+                                    let implements: FxHashSet<String> = obj
+                                        .implements
+                                        .iter()
+                                        .map(|iface| self.resolve(iface.value))
+                                        .collect();
+                                    self.type_implements.insert(name.clone(), implements);
+                                }
                             }
-                            // Collect which interfaces this type implements
-                            if !obj.implements.is_empty() {
-                                let implements: FxHashSet<String> = obj
-                                    .implements
-                                    .iter()
-                                    .map(|iface| self.resolve(iface.value))
-                                    .collect();
-                                self.type_implements.insert(name.clone(), implements);
+                            TypeDefinition::Input(input) => {
+                                if !input.type_params.is_empty() {
+                                    let params = self.collect_type_params(&input.type_params);
+                                    self.generic_types
+                                        .insert(name.clone(), GenericTypeInfo { params });
+                                }
                             }
+                            _ => {}
                         }
                     }
                 }
@@ -801,6 +806,12 @@ impl<'a> TypeChecker<'a> {
 
     /// Checks an input object type definition.
     fn check_input_type(&mut self, input: &InputObjectTypeDefinition<'_>) {
+        let prev_type_params = std::mem::take(&mut self.type_params_in_scope);
+        for param in &input.type_params {
+            self.type_params_in_scope
+                .insert(self.resolve(param.name.value));
+        }
+
         // Check for duplicate fields
         let mut seen_fields = FxHashSet::default();
         for field in &input.fields {
@@ -817,6 +828,8 @@ impl<'a> TypeChecker<'a> {
             }
             self.check_input_value_definition(field);
         }
+
+        self.type_params_in_scope = prev_type_params;
     }
 
     /// Checks an opaque type definition.
@@ -1496,6 +1509,53 @@ mod tests {
         "#,
         );
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_generic_input_type_with_constraint() {
+        let result = check_source(
+            r#"
+            interface Node {
+                id: ID
+            }
+            input NodeFilter<T extends Node> {
+                node: T
+            }
+            type User implements Node {
+                id: ID
+                name: String
+            }
+            type Query {
+                users(filter: NodeFilter<User>): String
+            }
+        "#,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_generic_input_type_with_constraint_violated() {
+        let result = check_source(
+            r#"
+            interface Node {
+                id: ID
+            }
+            input NodeFilter<T extends Node> {
+                node: T
+            }
+            type Post {
+                title: String
+            }
+            type Query {
+                posts(filter: NodeFilter<Post>): String
+            }
+        "#,
+        );
+        assert!(!result.is_ok());
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == codes::GENERIC_CONSTRAINT_VIOLATION));
     }
 
     #[test]

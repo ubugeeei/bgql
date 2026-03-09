@@ -245,75 +245,73 @@ impl QueryPlanner {
         // Check if we need to resolve nested selections
         if !field.selections.is_empty() {
             // Get the return type
-            if let Some(return_type) = ctx.schema.get_type(&return_type_name) {
-                if let TypeDef::Object(obj) = return_type {
-                    ctx.depth += 1;
-                    let max_depth = ctx.depth;
-                    let nested =
-                        self.plan_selections(&field.selections, obj, &return_type_name, ctx)?;
-                    if ctx.depth == max_depth {
-                        ctx.depth = max_depth;
-                    }
+            if let Some(TypeDef::Object(obj)) = ctx.schema.get_type(&return_type_name) {
+                ctx.depth += 1;
+                let max_depth = ctx.depth;
+                let nested =
+                    self.plan_selections(&field.selections, obj, &return_type_name, ctx)?;
+                if ctx.depth == max_depth {
+                    ctx.depth = max_depth;
+                }
 
-                    // Check for @defer directive
-                    let is_deferred = has_defer_directive(&field.arguments);
-                    let defer_label = get_defer_label(&field.arguments);
+                // Check for @defer directive
+                let is_deferred = has_defer_directive(&field.arguments);
+                let defer_label = get_defer_label(&field.arguments);
 
-                    if is_deferred {
-                        return Ok(PlanNode::Defer {
-                            node: Box::new(PlanNode::Field {
-                                info: FieldInfo {
-                                    name: field.name.clone(),
-                                    alias: field.alias.clone(),
-                                    parent_type: parent_type_name.to_string(),
-                                    return_type: return_type_name,
-                                    arguments,
-                                    is_introspection: false,
-                                },
-                                response_name,
-                                children: Box::new(nested),
-                            }),
-                            label: defer_label,
-                        });
-                    }
-
-                    // Check for @stream directive
-                    let is_streamed = has_stream_directive(&field.arguments);
-                    let stream_label = get_stream_label(&field.arguments);
-                    let initial_count = get_stream_initial_count(&field.arguments);
-
-                    if is_streamed {
-                        return Ok(PlanNode::Stream {
-                            node: Box::new(PlanNode::Field {
-                                info: FieldInfo {
-                                    name: field.name.clone(),
-                                    alias: field.alias.clone(),
-                                    parent_type: parent_type_name.to_string(),
-                                    return_type: return_type_name,
-                                    arguments,
-                                    is_introspection: false,
-                                },
-                                response_name,
-                                children: Box::new(nested),
-                            }),
-                            label: stream_label,
-                            initial_count,
-                        });
-                    }
-
-                    return Ok(PlanNode::Field {
-                        info: FieldInfo {
-                            name: field.name.clone(),
-                            alias: field.alias.clone(),
-                            parent_type: parent_type_name.to_string(),
-                            return_type: return_type_name,
-                            arguments,
-                            is_introspection: false,
-                        },
-                        response_name,
-                        children: Box::new(nested),
+                if is_deferred {
+                    return Ok(PlanNode::Defer {
+                        node: Box::new(PlanNode::Field {
+                            info: FieldInfo {
+                                name: field.name.clone(),
+                                alias: field.alias.clone(),
+                                parent_type: parent_type_name.to_string(),
+                                return_type: return_type_name,
+                                arguments,
+                                is_introspection: false,
+                            },
+                            response_name,
+                            children: Box::new(nested),
+                        }),
+                        label: defer_label,
                     });
                 }
+
+                // Check for @stream directive
+                let is_streamed = has_stream_directive(&field.arguments);
+                let stream_label = get_stream_label(&field.arguments);
+                let initial_count = get_stream_initial_count(&field.arguments);
+
+                if is_streamed {
+                    return Ok(PlanNode::Stream {
+                        node: Box::new(PlanNode::Field {
+                            info: FieldInfo {
+                                name: field.name.clone(),
+                                alias: field.alias.clone(),
+                                parent_type: parent_type_name.to_string(),
+                                return_type: return_type_name,
+                                arguments,
+                                is_introspection: false,
+                            },
+                            response_name,
+                            children: Box::new(nested),
+                        }),
+                        label: stream_label,
+                        initial_count,
+                    });
+                }
+
+                return Ok(PlanNode::Field {
+                    info: FieldInfo {
+                        name: field.name.clone(),
+                        alias: field.alias.clone(),
+                        parent_type: parent_type_name.to_string(),
+                        return_type: return_type_name,
+                        arguments,
+                        is_introspection: false,
+                    },
+                    response_name,
+                    children: Box::new(nested),
+                });
             }
         }
 

@@ -561,7 +561,6 @@ impl<'a> RustGenerator<'a> {
 
         for field in &obj.fields {
             let name = self.interner.get(field.name.value);
-            let return_type = self.convert_type(&field.ty, self.interner);
 
             let args_param = if field.arguments.is_empty() {
                 String::new()

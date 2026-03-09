@@ -239,8 +239,8 @@ fn parse_url(url: &str) -> SdkResult<(String, u16, String)> {
             ErrorCode::HttpsNotSupported,
             "HTTPS is not supported in the simple HTTP client. Use a proxy or configure your server for HTTP.",
         ));
-    } else if url.starts_with("http://") {
-        &url[7..]
+    } else if let Some(without_protocol) = url.strip_prefix("http://") {
+        without_protocol
     } else {
         url
     };

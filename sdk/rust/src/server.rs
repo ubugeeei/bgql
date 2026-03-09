@@ -375,7 +375,7 @@ impl BgqlServer {
     /// - GET /health - Health check endpoint
     /// - GET /.well-known/bgql - Server capabilities
     pub async fn listen(self) -> SdkResult<()> {
-        crate::http::run_server(Arc::new(self)).await
+        crate::http::run_server(self).await
     }
 
     /// Executes a query.
@@ -832,11 +832,13 @@ fn convert_value(value: &bgql_syntax::Value, interner: &Interner) -> HirValue {
 }
 
 /// DataLoader for batching and caching.
+type BatchLoadFuture<K, V> = Pin<Box<dyn Future<Output = HashMap<K, V>> + Send>>;
+
 pub struct DataLoader<K, V, F>
 where
     K: Eq + std::hash::Hash + Clone + Send,
     V: Clone + Send,
-    F: Fn(Vec<K>) -> Pin<Box<dyn Future<Output = HashMap<K, V>> + Send>> + Send + Sync,
+    F: Fn(Vec<K>) -> BatchLoadFuture<K, V> + Send + Sync,
 {
     inner: bgql_runtime::DataLoader<K, V, F>,
 }
@@ -845,7 +847,7 @@ impl<K, V, F> DataLoader<K, V, F>
 where
     K: Eq + std::hash::Hash + Clone + Send + 'static,
     V: Clone + Send + 'static,
-    F: Fn(Vec<K>) -> Pin<Box<dyn Future<Output = HashMap<K, V>> + Send>> + Send + Sync + 'static,
+    F: Fn(Vec<K>) -> BatchLoadFuture<K, V> + Send + Sync + 'static,
 {
     /// Creates a new DataLoader.
     pub fn new(batch_fn: F) -> Self {
@@ -873,11 +875,7 @@ where
 /// Creates a DataLoader with the given batch function.
 pub fn create_loader<K, V, F, Fut>(
     batch_fn: F,
-) -> DataLoader<
-    K,
-    V,
-    impl Fn(Vec<K>) -> Pin<Box<dyn Future<Output = HashMap<K, V>> + Send>> + Send + Sync,
->
+) -> DataLoader<K, V, impl Fn(Vec<K>) -> BatchLoadFuture<K, V> + Send + Sync>
 where
     K: Eq + std::hash::Hash + Clone + Send + 'static,
     V: Clone + Send + 'static,

@@ -7,7 +7,7 @@
     "dev": "bun --watch src/main.ts",
     "start": "bun src/main.ts",
     "typecheck": "tsgo --noEmit",
-    "codegen": "bgql codegen --lang typescript ../ts-server/schema/mod.bgql -o src/generated/types.ts"
+    "codegen": "cargo run -q --manifest-path ../../Cargo.toml -p bgql_cli -- codegen --lang typescript ../ts-server/schema/mod.bgql -o src/generated/types.ts"
   },
   "dependencies": {
     "@bgql/client": "workspace:*"

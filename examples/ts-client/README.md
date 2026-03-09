@@ -97,13 +97,15 @@ ts-client/
 
 ```bash
 # First, start the server (in another terminal)
-cd ../ts-server && npm run dev
+cd ../ts-server && bun install && bun run dev
 
 # Then run the client examples
 cd examples/ts-client
-npm install
-npm start
+bun install
+bun run start
 ```
+
+`bun run codegen` uses the workspace CLI via Cargo, so this example also works without a global `bgql` binary.
 
 ## API Reference
 

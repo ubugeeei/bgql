@@ -159,6 +159,7 @@ impl<'a> Formatter<'a> {
         }
 
         self.indent -= 1;
+        self.push_indent();
         self.output.push('}');
     }
 
@@ -181,6 +182,7 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &obj.description {
             self.format_description(desc);
         }
+        self.format_visibility(&obj.visibility);
         self.output.push_str("type ");
         self.output.push_str(&self.interner.get(obj.name.value));
         self.format_type_params(&obj.type_params);
@@ -190,6 +192,7 @@ impl<'a> Formatter<'a> {
         self.indent += 1;
         self.format_fields(&obj.fields);
         self.indent -= 1;
+        self.push_indent();
         self.output.push('}');
     }
 
@@ -197,6 +200,7 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &iface.description {
             self.format_description(desc);
         }
+        self.format_visibility(&iface.visibility);
         self.output.push_str("interface ");
         self.output.push_str(&self.interner.get(iface.name.value));
         self.format_type_params(&iface.type_params);
@@ -206,6 +210,7 @@ impl<'a> Formatter<'a> {
         self.indent += 1;
         self.format_fields(&iface.fields);
         self.indent -= 1;
+        self.push_indent();
         self.output.push('}');
     }
 
@@ -213,6 +218,7 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &u.description {
             self.format_description(desc);
         }
+        self.format_visibility(&u.visibility);
         self.output.push_str("union ");
         self.output.push_str(&self.interner.get(u.name.value));
         self.format_directives(&u.directives);
@@ -229,6 +235,7 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &e.description {
             self.format_description(desc);
         }
+        self.format_visibility(&e.visibility);
         self.output.push_str("enum ");
         self.output.push_str(&self.interner.get(e.name.value));
         self.format_directives(&e.directives);
@@ -248,6 +255,7 @@ impl<'a> Formatter<'a> {
             self.output.push('\n');
         }
         self.indent -= 1;
+        self.push_indent();
         self.output.push('}');
     }
 
@@ -267,10 +275,7 @@ impl<'a> Formatter<'a> {
                 self.output.push_str(" {\n");
                 self.indent += 1;
                 for field in fields {
-                    self.push_indent();
-                    self.output.push_str(&self.interner.get(field.name.value));
-                    self.output.push_str(": ");
-                    self.format_type(&field.ty);
+                    self.format_input_value_definition_block(field);
                     self.output.push('\n');
                 }
                 self.indent -= 1;
@@ -284,20 +289,19 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &inp.description {
             self.format_description(desc);
         }
+        self.format_visibility(&inp.visibility);
         self.output.push_str("input ");
         self.output.push_str(&self.interner.get(inp.name.value));
+        self.format_type_params(&inp.type_params);
         self.format_directives(&inp.directives);
         self.output.push_str(" {\n");
         self.indent += 1;
         for field in &inp.fields {
-            self.push_indent();
-            self.output.push_str(&self.interner.get(field.name.value));
-            self.output.push_str(": ");
-            self.format_type(&field.ty);
-            self.format_directives(&field.directives);
+            self.format_input_value_definition_block(field);
             self.output.push('\n');
         }
         self.indent -= 1;
+        self.push_indent();
         self.output.push('}');
     }
 
@@ -305,6 +309,7 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &s.description {
             self.format_description(desc);
         }
+        self.format_visibility(&s.visibility);
         self.output.push_str("scalar ");
         self.output.push_str(&self.interner.get(s.name.value));
         self.format_directives(&s.directives);
@@ -314,6 +319,7 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &o.description {
             self.format_description(desc);
         }
+        self.format_visibility(&o.visibility);
         self.output.push_str("opaque ");
         self.output.push_str(&self.interner.get(o.name.value));
         self.output.push_str(" = ");
@@ -325,7 +331,7 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &a.description {
             self.format_description(desc);
         }
-        self.output.push_str("alias ");
+        self.output.push_str("type alias ");
         self.output.push_str(&self.interner.get(a.name.value));
         self.output.push_str(" = ");
         self.format_type(&a.aliased);
@@ -335,6 +341,7 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &iu.description {
             self.format_description(desc);
         }
+        self.format_visibility(&iu.visibility);
         self.output.push_str("input union ");
         self.output.push_str(&self.interner.get(iu.name.value));
         self.format_directives(&iu.directives);
@@ -351,6 +358,7 @@ impl<'a> Formatter<'a> {
         if let Some(desc) = &ie.description {
             self.format_description(desc);
         }
+        self.format_visibility(&ie.visibility);
         self.output.push_str("input enum ");
         self.output.push_str(&self.interner.get(ie.name.value));
         self.format_directives(&ie.directives);
@@ -364,37 +372,85 @@ impl<'a> Formatter<'a> {
                 self.push_indent();
             }
             self.output.push_str(&self.interner.get(variant.name.value));
-            self.format_directives(&variant.directives);
 
             if let Some(fields) = &variant.fields {
-                self.output.push_str(" { ");
-                for (i, field) in fields.iter().enumerate() {
-                    if i > 0 {
-                        self.output.push_str(", ");
-                    }
-                    self.output.push_str(&self.interner.get(field.name.value));
-                    self.output.push_str(": ");
-                    self.format_type(&field.ty);
+                self.output.push_str(" {\n");
+                self.indent += 1;
+                for field in fields {
+                    self.format_input_value_definition_block(field);
+                    self.output.push('\n');
                 }
-                self.output.push_str(" }");
+                self.indent -= 1;
+                self.push_indent();
+                self.output.push('}');
             }
+            self.format_directives(&variant.directives);
             self.output.push('\n');
         }
 
         self.indent -= 1;
+        self.push_indent();
         self.output.push('}');
     }
 
-    fn format_directive_definition(&mut self, _d: &DirectiveDefinitionNode<'_>) {
-        // TODO: Implement
+    fn format_directive_definition(&mut self, directive: &DirectiveDefinitionNode<'_>) {
+        if let Some(desc) = &directive.description {
+            self.format_description(desc);
+        }
+        self.output.push_str("directive @");
+        self.output
+            .push_str(&self.interner.get(directive.name.value));
+        self.format_parenthesized_input_values(&directive.arguments);
+        if directive.repeatable {
+            self.output.push_str(" repeatable");
+        }
+        if !directive.locations.is_empty() {
+            self.output.push_str(" on ");
+            for (i, location) in directive.locations.iter().enumerate() {
+                if i > 0 {
+                    self.output.push_str(" | ");
+                }
+                self.output.push_str(location.as_str());
+            }
+        }
     }
 
-    fn format_operation(&mut self, _o: &OperationDefinition<'_>) {
-        // TODO: Implement
+    fn format_operation(&mut self, operation: &OperationDefinition<'_>) {
+        let can_use_shorthand = operation.operation == OperationType::Query
+            && operation.name.is_none()
+            && operation.variables.is_empty()
+            && operation.directives.is_empty();
+
+        if can_use_shorthand {
+            self.format_selection_set(&operation.selection_set, false);
+            return;
+        }
+
+        self.output.push_str(match operation.operation {
+            OperationType::Query => "query",
+            OperationType::Mutation => "mutation",
+            OperationType::Subscription => "subscription",
+        });
+
+        if let Some(name) = &operation.name {
+            self.output.push(' ');
+            self.output.push_str(&self.interner.get(name.value));
+        }
+
+        self.format_variable_definitions(&operation.variables);
+        self.format_directives(&operation.directives);
+        self.format_selection_set(&operation.selection_set, true);
     }
 
-    fn format_fragment(&mut self, _f: &FragmentDefinition<'_>) {
-        // TODO: Implement
+    fn format_fragment(&mut self, fragment: &FragmentDefinition<'_>) {
+        self.output.push_str("fragment ");
+        self.output
+            .push_str(&self.interner.get(fragment.name.value));
+        self.output.push_str(" on ");
+        self.output
+            .push_str(&self.interner.get(fragment.type_condition.value));
+        self.format_directives(&fragment.directives);
+        self.format_selection_set(&fragment.selection_set, true);
     }
 
     fn format_fields(&mut self, fields: &[FieldDefinition<'_>]) {
@@ -405,22 +461,151 @@ impl<'a> Formatter<'a> {
             }
             self.push_indent();
             self.output.push_str(&self.interner.get(field.name.value));
-            if !field.arguments.is_empty() {
-                self.output.push('(');
-                for (i, arg) in field.arguments.iter().enumerate() {
-                    if i > 0 {
-                        self.output.push_str(", ");
-                    }
-                    self.output.push_str(&self.interner.get(arg.name.value));
-                    self.output.push_str(": ");
-                    self.format_type(&arg.ty);
-                }
-                self.output.push(')');
-            }
+            self.format_parenthesized_input_values(&field.arguments);
             self.output.push_str(": ");
             self.format_type(&field.ty);
             self.format_directives(&field.directives);
             self.output.push('\n');
+        }
+    }
+
+    fn format_input_value_definition_inline(&mut self, value: &InputValueDefinition<'_>) {
+        self.output.push_str(&self.interner.get(value.name.value));
+        self.output.push_str(": ");
+        self.format_type(&value.ty);
+        if let Some(default_value) = &value.default_value {
+            self.output.push_str(" = ");
+            self.format_value(default_value);
+        }
+        self.format_directives(&value.directives);
+    }
+
+    fn format_input_value_definition_block(&mut self, value: &InputValueDefinition<'_>) {
+        if let Some(desc) = &value.description {
+            self.push_indent();
+            self.format_description(desc);
+        }
+        self.push_indent();
+        self.format_input_value_definition_inline(value);
+    }
+
+    fn format_parenthesized_input_values(&mut self, values: &[InputValueDefinition<'_>]) {
+        if values.is_empty() {
+            return;
+        }
+
+        let multiline = values.iter().any(|value| value.description.is_some());
+        if multiline {
+            self.output.push_str("(\n");
+            self.indent += 1;
+            for value in values {
+                self.format_input_value_definition_block(value);
+                self.output.push('\n');
+            }
+            self.indent -= 1;
+            self.push_indent();
+            self.output.push(')');
+            return;
+        }
+
+        self.output.push('(');
+        for (i, value) in values.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str(", ");
+            }
+            self.format_input_value_definition_inline(value);
+        }
+        self.output.push(')');
+    }
+
+    fn format_variable_definitions(&mut self, variables: &[VariableDefinition<'_>]) {
+        if variables.is_empty() {
+            return;
+        }
+
+        self.output.push('(');
+        for (i, variable) in variables.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str(", ");
+            }
+            self.output.push('$');
+            self.output
+                .push_str(&self.interner.get(variable.name.value));
+            self.output.push_str(": ");
+            self.format_type(&variable.ty);
+            if let Some(default_value) = &variable.default_value {
+                self.output.push_str(" = ");
+                self.format_value(default_value);
+            }
+            self.format_directives(&variable.directives);
+        }
+        self.output.push(')');
+    }
+
+    fn format_selection_set(&mut self, selection_set: &SelectionSet<'_>, leading_space: bool) {
+        if leading_space {
+            self.output.push(' ');
+        }
+        self.output.push_str("{\n");
+        self.indent += 1;
+        for selection in &selection_set.selections {
+            self.push_indent();
+            self.format_selection(selection);
+            self.output.push('\n');
+        }
+        self.indent -= 1;
+        self.push_indent();
+        self.output.push('}');
+    }
+
+    fn format_selection(&mut self, selection: &Selection<'_>) {
+        match selection {
+            Selection::Field(field) => self.format_field_selection(field),
+            Selection::FragmentSpread(spread) => {
+                if spread.shorthand {
+                    self.output.push_str("...@");
+                } else {
+                    self.output.push_str("...");
+                }
+                self.output.push_str(&self.interner.get(spread.name.value));
+                self.format_directives(&spread.directives);
+            }
+            Selection::InlineFragment(fragment) => {
+                self.output.push_str("...");
+                if let Some(type_condition) = &fragment.type_condition {
+                    self.output.push_str(" on ");
+                    self.output
+                        .push_str(&self.interner.get(type_condition.value));
+                }
+                self.format_directives(&fragment.directives);
+                self.format_selection_set(&fragment.selection_set, true);
+            }
+        }
+    }
+
+    fn format_field_selection(&mut self, field: &FieldSelection<'_>) {
+        if let Some(alias) = &field.alias {
+            self.output.push_str(&self.interner.get(alias.value));
+            self.output.push_str(": ");
+        }
+
+        self.output.push_str(&self.interner.get(field.name.value));
+        if !field.arguments.is_empty() {
+            self.output.push('(');
+            for (i, argument) in field.arguments.iter().enumerate() {
+                if i > 0 {
+                    self.output.push_str(", ");
+                }
+                self.output
+                    .push_str(&self.interner.get(argument.name.value));
+                self.output.push_str(": ");
+                self.format_value(&argument.value);
+            }
+            self.output.push(')');
+        }
+        self.format_directives(&field.directives);
+        if let Some(selection_set) = &field.selection_set {
+            self.format_selection_set(selection_set, true);
         }
     }
 
@@ -615,4 +800,90 @@ pub fn format_with_options(
 ) -> String {
     let mut formatter = Formatter::new(interner, options);
     formatter.format(document)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::parse;
+
+    #[test]
+    fn test_format_round_trip_for_executable_definitions() {
+        let interner = Interner::new();
+        let parsed = parse(
+            r#"
+            directive @tag(
+                "tag name"
+                name: String = "user",
+                enabled: Boolean = true
+            ) repeatable on FIELD | FRAGMENT_SPREAD
+
+            query GetUser($id: ID = 1, $tags: List<String> = ["a", "b"]) @cached(ttl: 60, scope: PUBLIC) {
+                user(id: $id, options: { active: true, tags: ["x", "y"] }) {
+                    id,
+                    name,
+                    ...UserFields @defer(label: "details"),
+                    ... on Admin {
+                        role,
+                    }
+                }
+            }
+
+            fragment UserFields on User {
+                email,
+            }
+            "#,
+            &interner,
+        );
+        assert!(!parsed.diagnostics.has_errors());
+
+        let formatted = format(&parsed.document, &interner);
+        assert!(formatted.contains("directive @tag("));
+        assert!(formatted.contains("query GetUser("));
+        assert!(formatted.contains("fragment UserFields on User"));
+
+        let reparsed = parse(&formatted, &interner);
+        assert!(!reparsed.diagnostics.has_errors());
+        assert_eq!(
+            reparsed.document.definitions.len(),
+            parsed.document.definitions.len()
+        );
+    }
+
+    #[test]
+    fn test_format_preserves_visibility_and_defaults() {
+        let interner = Interner::new();
+        let parsed = parse(
+            r#"
+            pub type Query {
+                user(
+                    "user id"
+                    id: ID = 1 @fromContext
+                ): User @cache(maxAge: 60, scope: PUBLIC)
+            }
+
+            pub input Filter {
+                limit: Int = 10 @min(value: 1)
+            }
+
+            pub input SortField<Field extends String> {
+                field: Field
+            }
+
+            pub opaque Slug = String @pattern(regex: "^[a-z]+$")
+            "#,
+            &interner,
+        );
+        assert!(!parsed.diagnostics.has_errors());
+
+        let formatted = format(&parsed.document, &interner);
+        assert!(formatted.contains("pub type Query"));
+        assert!(formatted.contains("id: ID = 1 @fromContext"));
+        assert!(formatted.contains("limit: Int = 10 @min(value: 1)"));
+        assert!(formatted.contains("pub input SortField<Field extends String>"));
+        assert!(formatted.contains(r#"pub opaque Slug = String @pattern(regex: "^[a-z]+$")"#));
+
+        let reparsed = parse(&formatted, &interner);
+        assert!(!reparsed.diagnostics.has_errors());
+    }
 }

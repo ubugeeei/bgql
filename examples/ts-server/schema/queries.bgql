@@ -55,7 +55,7 @@ pub type Query {
 
   # Global search across users and posts
   search(
-    query: String @minLength(2) @maxLength(100)
+    query: String @minLength(value: 2) @maxLength(value: 100)
     first: Option<Int>
   ): SearchResults
 }

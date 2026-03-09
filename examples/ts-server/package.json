@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "schema": "bgql build schema/mod.bgql -o dist/schema.graphql",
-    "codegen": "bgql codegen --lang typescript schema/mod.bgql -o src/generated/types.ts",
+    "schema": "cargo run -q --manifest-path ../../Cargo.toml -p bgql_cli -- build schema/mod.bgql -o dist/schema.graphql",
+    "codegen": "cargo run -q --manifest-path ../../Cargo.toml -p bgql_cli -- codegen --lang typescript schema/mod.bgql -o src/generated/types.ts",
     "dev": "bun run schema && bun --watch src/server.ts",
     "build": "bun run schema && tsdown",
     "start": "bun dist/server.js",

@@ -21,6 +21,10 @@ run = "cargo test --workspace --all-features"
 description = "Run clippy"
 run = "cargo clippy --workspace --all-features -- -D warnings"
 
+[tasks.lint]
+description = "Run lint workflow"
+depends = ["clippy"]
+
 [tasks.fmt]
 description = "Format code"
 run = "cargo fmt --all"

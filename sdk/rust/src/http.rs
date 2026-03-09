@@ -16,7 +16,6 @@ use hyper_util::rt::TokioIo;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info};
 
@@ -199,7 +198,7 @@ pub(crate) fn health_response() -> &'static str {
 }
 
 /// Starts the HTTP server.
-pub(crate) async fn run_server(server: Arc<BgqlServer>) -> SdkResult<()> {
+pub(crate) async fn run_server(server: BgqlServer) -> SdkResult<()> {
     let config = server.config();
     let addr: SocketAddr = format!("{}:{}", config.host, config.port)
         .parse()

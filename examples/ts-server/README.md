@@ -132,8 +132,10 @@ const resolvers = {
 ### Prerequisites
 
 - [Bun](https://bun.sh/) v1.0+
-- [bgql CLI](../../) installed (`cargo install bgql`)
+- Rust toolchain with Cargo
 - [tsgo](https://www.npmjs.com/package/@typescript/native-preview) (optional, for type checking)
+
+The example uses the workspace CLI through `cargo run -p bgql_cli -- ...`, so a global `bgql` install is not required.
 
 ### Installation
 
@@ -149,9 +151,16 @@ bun install
 bun run dev
 
 # Or step by step:
-bun run schema    # Compile .bgql to GraphQL SDL
-bun run codegen   # Generate TypeScript types
+bun run schema    # Compile .bgql to GraphQL SDL with the workspace CLI
+bun run codegen   # Generate TypeScript types with the workspace CLI
 bun run dev       # Start server
+```
+
+### Schema Check
+
+```bash
+cd /Users/nishimura/projects/oss/ubugeeei/bgql
+cargo run -p bgql_cli -- check examples/ts-server/schema/*.bgql
 ```
 
 ### Production Build
@@ -256,7 +265,7 @@ input union LoginCredentials = EmailCredentials | OAuthCredentials
 
 # Validation directives
 input CreateUserInput {
-  name: String @minLength(2) @maxLength(100) @trim
+  name: String @minLength(value: 2) @maxLength(value: 100) @trim
   email: String @email @lowercase
 }
 

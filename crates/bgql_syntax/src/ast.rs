@@ -135,6 +135,7 @@ pub struct InputObjectTypeDefinition<'a> {
     pub description: Option<Description<'a>>,
     pub visibility: Visibility,
     pub name: Name,
+    pub type_params: Vec<TypeParameter<'a>>,
     pub directives: Vec<Directive<'a>>,
     pub fields: Vec<InputValueDefinition<'a>>,
     pub span: Span,
@@ -382,6 +383,7 @@ pub struct FieldSelection<'a> {
 #[derive(Debug, Clone)]
 pub struct FragmentSpread<'a> {
     pub name: Name,
+    pub shorthand: bool,
     pub directives: Vec<Directive<'a>>,
     pub span: Span,
 }

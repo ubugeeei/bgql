@@ -659,7 +659,7 @@ type User {
     removal: "2025.1"                              # Scheduled removal
   )
   email: String
-  phoneNumber: String @since("2024.1")             # Added in 2024.1
+  phoneNumber: String @since(version: "2024.1")    # Added in 2024.1
 }
 ```
 
@@ -1220,62 +1220,86 @@ bgql/
 │   ├── bgql_codegen/         # Code generation (Rust, TypeScript, Go)
 │   ├── bgql_lsp/             # Language Server Protocol
 │   ├── bgql_wasm/            # WebAssembly bindings
-│   ├── bgql_sdk/             # SDK library
 │   └── bgql_cli/             # CLI tool
+├── sdk/
+│   ├── rust/                 # Rust SDK
+│   └── typescript/           # TypeScript SDK
 ├── npm/
 │   ├── client/               # Client SDK
 │   │   └── devtools/         # Browser DevTools extension
 │   └── server/               # Server SDK
 ├── playground/               # Web playground
 ├── examples/
+│   ├── rust-server/          # Rust server example
+│   ├── ts-server/            # TypeScript server example
+│   ├── ts-client/            # Type-safe TypeScript client example
 │   └── vue-streaming/        # Vue streaming example
 └── spec/                     # Specification documents
 ```
+
+## Repository Style
+
+This repository follows the same defaults as [start](https://github.com/ubugeeei/start): predictable tooling, strong static guarantees, small modules, and explicit conventions.
+
+For `.bgql` files in this repo, prefer:
+
+- small modules wired with `mod`, `use`, and `pub`
+- `type alias` over bare `alias`
+- named directive arguments in committed docs and examples, for example `@min(value: 1)` and `@pattern(regex: "...")`
+- explicit `Option<T>` in docs and examples when clarity matters; `T?`, `T!`, and positional directive shorthand are accepted for migration, not preferred as the canonical style
 
 ---
 
 ## Installation
 
-### From Source
+### Tooling
+
+```bash
+mise --version
+bun --version
+cargo --version
+```
+
+- [mise](https://mise.jdx.dev/) for toolchain setup and common tasks
+- Bun for TypeScript examples and packages
+- `wasm-pack` only when building `crates/bgql_wasm`
+
+### Bootstrap
 
 ```bash
 git clone https://github.com/ubugeeei/bgql.git
 cd bgql
 
-# Build Rust crates
-cargo build --release
-
-# Build WASM module
-wasm-pack build crates/bgql_wasm --target web
-
-# Install npm packages
-cd npm/client && bun install
+mise install
+bun install
+cargo build -p bgql_cli
 ```
 
 ## Development
 
-### Prerequisites
-
-- Rust 1.75+
-- wasm-pack
-- Bun or Node.js
-
-### Commands
+### Common Commands
 
 ```bash
-# Run all tests
-cargo test --workspace --all-features
+mise run check
+mise run test
+mise run lint
+mise run fmt:check
 
-# Check formatting and lints
-cargo fmt --all -- --check
-cargo clippy --workspace --all-features -- -D warnings
+# Validate the reference schemas
+cargo run -p bgql_cli -- check examples/schema.bgql examples/queries.bgql
 
-# Build documentation
-cargo doc --workspace --all-features --no-deps
-
-# Run playground
+# Run the playground
 cd playground && bun run dev
 ```
+
+## Examples
+
+- `examples/rust-server`: `cargo run --manifest-path examples/rust-server/Cargo.toml`
+- `examples/ts-server`: `cd examples/ts-server && bun install && bun run dev`
+- `examples/ts-client`: `cd examples/ts-client && bun install && bun run start`
+- `examples/vue-streaming`: `cd examples/vue-streaming && bun install && bun run dev`
+
+The TypeScript examples use the workspace CLI through Cargo, so no global `bgql` install is required.
 
 ---
 

@@ -39,10 +39,7 @@ impl PubSub {
         let channels = self.channels.read().await;
 
         if let Some(sender) = channels.get(topic) {
-            match sender.send(event) {
-                Ok(count) => count,
-                Err(_) => 0,
-            }
+            sender.send(event).unwrap_or_default()
         } else {
             0
         }

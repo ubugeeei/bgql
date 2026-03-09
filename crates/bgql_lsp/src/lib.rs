@@ -861,52 +861,49 @@ fn compute_semantic_tokens(
     let mut prev_start = 0u32;
 
     for def in &document.definitions {
-        match def {
-            Definition::Type(type_def) => {
-                let (span, _name) = match type_def {
-                    TypeDefinition::Object(obj) => (obj.name.span, interner.get(obj.name.value)),
-                    TypeDefinition::Interface(iface) => {
-                        (iface.name.span, interner.get(iface.name.value))
-                    }
-                    TypeDefinition::Enum(e) => (e.name.span, interner.get(e.name.value)),
-                    TypeDefinition::Union(u) => (u.name.span, interner.get(u.name.value)),
-                    TypeDefinition::Input(i) => (i.name.span, interner.get(i.name.value)),
-                    TypeDefinition::Scalar(s) => (s.name.span, interner.get(s.name.value)),
-                    TypeDefinition::Opaque(o) => (o.name.span, interner.get(o.name.value)),
-                    TypeDefinition::TypeAlias(a) => (a.name.span, interner.get(a.name.value)),
-                    TypeDefinition::InputUnion(iu) => (iu.name.span, interner.get(iu.name.value)),
-                    TypeDefinition::InputEnum(ie) => (ie.name.span, interner.get(ie.name.value)),
-                };
+        if let Definition::Type(type_def) = def {
+            let (span, _name) = match type_def {
+                TypeDefinition::Object(obj) => (obj.name.span, interner.get(obj.name.value)),
+                TypeDefinition::Interface(iface) => {
+                    (iface.name.span, interner.get(iface.name.value))
+                }
+                TypeDefinition::Enum(e) => (e.name.span, interner.get(e.name.value)),
+                TypeDefinition::Union(u) => (u.name.span, interner.get(u.name.value)),
+                TypeDefinition::Input(i) => (i.name.span, interner.get(i.name.value)),
+                TypeDefinition::Scalar(s) => (s.name.span, interner.get(s.name.value)),
+                TypeDefinition::Opaque(o) => (o.name.span, interner.get(o.name.value)),
+                TypeDefinition::TypeAlias(a) => (a.name.span, interner.get(a.name.value)),
+                TypeDefinition::InputUnion(iu) => (iu.name.span, interner.get(iu.name.value)),
+                TypeDefinition::InputEnum(ie) => (ie.name.span, interner.get(ie.name.value)),
+            };
 
-                let pos = offset_to_position(content, span.start as usize);
-                let length = (span.end - span.start) as u32;
+            let pos = offset_to_position(content, span.start as usize);
+            let length = span.end - span.start;
 
-                let delta_line = pos.line - prev_line;
-                let delta_start = if delta_line == 0 {
-                    pos.character - prev_start
-                } else {
-                    pos.character
-                };
+            let delta_line = pos.line - prev_line;
+            let delta_start = if delta_line == 0 {
+                pos.character - prev_start
+            } else {
+                pos.character
+            };
 
-                let token_type = match type_def {
-                    TypeDefinition::Interface(_) => 3, // INTERFACE
-                    TypeDefinition::Enum(_) => 2,      // ENUM
-                    TypeDefinition::Input(_) => 4,     // STRUCT
-                    _ => 1,                            // CLASS
-                };
+            let token_type = match type_def {
+                TypeDefinition::Interface(_) => 3, // INTERFACE
+                TypeDefinition::Enum(_) => 2,      // ENUM
+                TypeDefinition::Input(_) => 4,     // STRUCT
+                _ => 1,                            // CLASS
+            };
 
-                tokens.push(SemanticToken {
-                    delta_line,
-                    delta_start,
-                    length,
-                    token_type,
-                    token_modifiers_bitset: 1, // DECLARATION
-                });
+            tokens.push(SemanticToken {
+                delta_line,
+                delta_start,
+                length,
+                token_type,
+                token_modifiers_bitset: 1, // DECLARATION
+            });
 
-                prev_line = pos.line;
-                prev_start = pos.character;
-            }
-            _ => {}
+            prev_line = pos.line;
+            prev_start = pos.character;
         }
     }
 

@@ -37,14 +37,21 @@ rust-server/
 
 ```bash
 cd examples/rust-server
-cargo run --release
+cargo run
 ```
 
 Server starts at `http://localhost:4000`.
 
+## Schema Check
+
+```bash
+cd /Users/nishimura/projects/oss/ubugeeei/bgql
+cargo run -p bgql_cli -- check examples/rust-server/schema.bgql examples/rust-server/schema/common/*.bgql
+```
+
 ## Type-Safe Pattern
 
-### 1. Schema (schema.bgql)
+### 1. Schema (`schema.bgql`)
 
 ```graphql
 type Query {
@@ -54,6 +61,8 @@ type Query {
   posts(filter: Option<PostFilter>, pagination: Option<PaginationInput>): Connection<Post>
 }
 ```
+
+Additional schema examples for generics, constraints, and reusable pagination live under `examples/rust-server/schema/common/`.
 
 ### 2. Generated Traits (generated.rs)
 

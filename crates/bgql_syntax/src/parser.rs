@@ -22,6 +22,11 @@ pub struct ParseResult<'a> {
     pub diagnostics: DiagnosticBag,
 }
 
+enum ParsedDefinition<'a> {
+    Regular(Definition<'a>),
+    Extension(Definition<'a>),
+}
+
 /// Parses a source string into a document.
 pub fn parse<'a>(source: &'a str, interner: &'a Interner) -> ParseResult<'a> {
     let mut parser = Parser::new(source, interner);
@@ -61,6 +66,13 @@ impl<'a> Parser<'a> {
     /// Advances to the next token.
     fn advance(&mut self) {
         self.current = self.lexer.next_token();
+    }
+
+    /// Skips any comma separators.
+    fn skip_commas(&mut self) {
+        while self.at_kind(TokenKind::Comma) {
+            self.advance();
+        }
     }
 
     /// Expects a specific token kind.
@@ -110,8 +122,12 @@ impl<'a> Parser<'a> {
         let mut definitions = Vec::new();
 
         while !self.at_kind(TokenKind::Eof) {
+            self.skip_commas();
+            if self.at_kind(TokenKind::Eof) {
+                break;
+            }
             if let Some(def) = self.parse_definition() {
-                definitions.push(def);
+                self.push_parsed_definition(&mut definitions, def);
             } else {
                 // Recovery: skip to next definition
                 self.advance();
@@ -126,7 +142,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a definition.
-    fn parse_definition(&mut self) -> Option<Definition<'a>> {
+    fn parse_definition(&mut self) -> Option<ParsedDefinition<'a>> {
         // Skip description for now
         let description = self.try_parse_description();
 
@@ -134,61 +150,404 @@ impl<'a> Parser<'a> {
         let visibility = self.parse_visibility();
 
         match self.at() {
-            TokenKind::Schema => Some(Definition::Schema(
+            TokenKind::Schema => Some(ParsedDefinition::Regular(Definition::Schema(
                 self.parse_schema_definition(description),
-            )),
-            TokenKind::Type => Some(Definition::Type(TypeDefinition::Object(
-                self.parse_object_type_with_visibility(description, visibility),
             ))),
-            TokenKind::Interface => Some(Definition::Type(TypeDefinition::Interface(
-                self.parse_interface_type_with_visibility(description, visibility),
+            TokenKind::Type => {
+                if self.peek_next() == TokenKind::Alias {
+                    self.advance(); // type
+                    Some(ParsedDefinition::Regular(Definition::Type(
+                        TypeDefinition::TypeAlias(self.parse_type_alias(description)),
+                    )))
+                } else {
+                    Some(ParsedDefinition::Regular(Definition::Type(
+                        TypeDefinition::Object(self.parse_object_type_with_visibility(
+                            description,
+                            visibility,
+                            false,
+                        )),
+                    )))
+                }
+            }
+            TokenKind::Interface => Some(ParsedDefinition::Regular(Definition::Type(
+                TypeDefinition::Interface(self.parse_interface_type_with_visibility(
+                    description,
+                    visibility,
+                    false,
+                )),
             ))),
-            TokenKind::Union => Some(Definition::Type(TypeDefinition::Union(
-                self.parse_union_type_with_visibility(description, visibility),
+            TokenKind::Union => Some(ParsedDefinition::Regular(Definition::Type(
+                TypeDefinition::Union(
+                    self.parse_union_type_with_visibility(description, visibility),
+                ),
             ))),
-            TokenKind::Enum => Some(Definition::Type(TypeDefinition::Enum(
-                self.parse_enum_type_with_visibility(description, visibility),
+            TokenKind::Enum => Some(ParsedDefinition::Regular(Definition::Type(
+                TypeDefinition::Enum(self.parse_enum_type_with_visibility(description, visibility)),
             ))),
             TokenKind::Input => {
                 // Could be input union or input enum
                 if self.peek_next() == TokenKind::Union {
-                    Some(Definition::Type(TypeDefinition::InputUnion(
-                        self.parse_input_union_type_with_visibility(description, visibility),
+                    Some(ParsedDefinition::Regular(Definition::Type(
+                        TypeDefinition::InputUnion(
+                            self.parse_input_union_type_with_visibility(description, visibility),
+                        ),
                     )))
                 } else if self.peek_next() == TokenKind::Enum {
-                    Some(Definition::Type(TypeDefinition::InputEnum(
-                        self.parse_input_enum_type_with_visibility(description, visibility),
+                    Some(ParsedDefinition::Regular(Definition::Type(
+                        TypeDefinition::InputEnum(
+                            self.parse_input_enum_type_with_visibility(description, visibility),
+                        ),
                     )))
                 } else {
-                    Some(Definition::Type(TypeDefinition::Input(
-                        self.parse_input_object_type_with_visibility(description, visibility),
+                    Some(ParsedDefinition::Regular(Definition::Type(
+                        TypeDefinition::Input(
+                            self.parse_input_object_type_with_visibility(description, visibility),
+                        ),
                     )))
                 }
             }
-            TokenKind::Scalar => Some(Definition::Type(TypeDefinition::Scalar(
-                self.parse_scalar_type_with_visibility(description, visibility),
+            TokenKind::Scalar => Some(ParsedDefinition::Regular(Definition::Type(
+                TypeDefinition::Scalar(
+                    self.parse_scalar_type_with_visibility(description, visibility),
+                ),
             ))),
-            TokenKind::Opaque => Some(Definition::Type(TypeDefinition::Opaque(
-                self.parse_opaque_type_with_visibility(description, visibility),
+            TokenKind::Opaque => Some(ParsedDefinition::Regular(Definition::Type(
+                TypeDefinition::Opaque(
+                    self.parse_opaque_type_with_visibility(description, visibility),
+                ),
             ))),
-            TokenKind::Alias => Some(Definition::Type(TypeDefinition::TypeAlias(
-                self.parse_type_alias(description),
+            TokenKind::Alias => Some(ParsedDefinition::Regular(Definition::Type(
+                TypeDefinition::TypeAlias(self.parse_type_alias(description)),
             ))),
-            TokenKind::Directive => Some(Definition::Directive(
+            TokenKind::Directive => Some(ParsedDefinition::Regular(Definition::Directive(
                 self.parse_directive_definition(description),
-            )),
+            ))),
             TokenKind::Query
             | TokenKind::Mutation
             | TokenKind::Subscription
-            | TokenKind::LBrace => Some(Definition::Operation(self.parse_operation())),
-            TokenKind::Fragment => Some(Definition::Fragment(self.parse_fragment_definition())),
-            TokenKind::Mod => Some(Definition::Module(
+            | TokenKind::LBrace => Some(ParsedDefinition::Regular(Definition::Operation(
+                self.parse_operation(),
+            ))),
+            TokenKind::Fragment => Some(ParsedDefinition::Regular(Definition::Fragment(
+                self.parse_fragment_definition(),
+            ))),
+            TokenKind::Mod => Some(ParsedDefinition::Regular(Definition::Module(
                 self.parse_module_declaration(visibility),
-            )),
-            TokenKind::Use => Some(Definition::Use(self.parse_use_statement(visibility))),
+            ))),
+            TokenKind::Use => Some(ParsedDefinition::Regular(Definition::Use(
+                self.parse_use_statement(visibility),
+            ))),
+            TokenKind::Extend => self.parse_extension_definition(description, visibility),
             _ => {
                 self.error("expected definition");
                 None
+            }
+        }
+    }
+
+    fn push_parsed_definition(
+        &mut self,
+        definitions: &mut Vec<Definition<'a>>,
+        parsed: ParsedDefinition<'a>,
+    ) {
+        match parsed {
+            ParsedDefinition::Regular(definition) => definitions.push(definition),
+            ParsedDefinition::Extension(definition) => {
+                if !self.merge_extension_definition(definitions, definition.clone()) {
+                    definitions.push(definition);
+                }
+            }
+        }
+    }
+
+    fn parse_extension_definition(
+        &mut self,
+        description: Option<Description<'a>>,
+        visibility: Visibility,
+    ) -> Option<ParsedDefinition<'a>> {
+        self.advance(); // extend
+
+        let definition = match self.at() {
+            TokenKind::Schema => Definition::Schema(self.parse_schema_definition(description)),
+            TokenKind::Type => {
+                if self.peek_next() == TokenKind::Alias {
+                    self.advance(); // type
+                    Definition::Type(TypeDefinition::TypeAlias(
+                        self.parse_type_alias(description),
+                    ))
+                } else {
+                    Definition::Type(TypeDefinition::Object(
+                        self.parse_object_type_with_visibility(description, visibility, true),
+                    ))
+                }
+            }
+            TokenKind::Interface => Definition::Type(TypeDefinition::Interface(
+                self.parse_interface_type_with_visibility(description, visibility, true),
+            )),
+            TokenKind::Union => Definition::Type(TypeDefinition::Union(
+                self.parse_union_type_with_visibility(description, visibility),
+            )),
+            TokenKind::Enum => Definition::Type(TypeDefinition::Enum(
+                self.parse_enum_type_with_visibility(description, visibility),
+            )),
+            TokenKind::Input => {
+                if self.peek_next() == TokenKind::Union {
+                    Definition::Type(TypeDefinition::InputUnion(
+                        self.parse_input_union_type_with_visibility(description, visibility),
+                    ))
+                } else if self.peek_next() == TokenKind::Enum {
+                    Definition::Type(TypeDefinition::InputEnum(
+                        self.parse_input_enum_type_with_visibility(description, visibility),
+                    ))
+                } else {
+                    Definition::Type(TypeDefinition::Input(
+                        self.parse_input_object_type_with_visibility(description, visibility),
+                    ))
+                }
+            }
+            TokenKind::Scalar => Definition::Type(TypeDefinition::Scalar(
+                self.parse_scalar_type_with_visibility(description, visibility),
+            )),
+            _ => {
+                self.error("expected extendable definition");
+                return None;
+            }
+        };
+
+        Some(ParsedDefinition::Extension(definition))
+    }
+
+    fn merge_extension_definition(
+        &mut self,
+        definitions: &mut [Definition<'a>],
+        extension: Definition<'a>,
+    ) -> bool {
+        match extension {
+            Definition::Schema(schema_extension) => {
+                for definition in definitions {
+                    if let Definition::Schema(schema) = definition {
+                        self.merge_schema_definition(schema, schema_extension);
+                        return true;
+                    }
+                }
+                false
+            }
+            Definition::Type(type_extension) => {
+                for definition in definitions {
+                    if let Definition::Type(type_definition) = definition {
+                        if self.merge_type_definition(type_definition, type_extension.clone()) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
+    }
+
+    fn merge_schema_definition(
+        &mut self,
+        schema: &mut SchemaDefinition<'a>,
+        extension: SchemaDefinition<'a>,
+    ) {
+        schema.directives.extend(extension.directives);
+        for operation in extension.operations {
+            if schema
+                .operations
+                .iter()
+                .all(|existing| existing.operation != operation.operation)
+            {
+                schema.operations.push(operation);
+            }
+        }
+        schema.span = Span::new(schema.span.start, extension.span.end);
+    }
+
+    fn merge_type_definition(
+        &mut self,
+        type_definition: &mut TypeDefinition<'a>,
+        extension: TypeDefinition<'a>,
+    ) -> bool {
+        match (type_definition, extension) {
+            (TypeDefinition::Object(base), TypeDefinition::Object(extension))
+                if base.name.value == extension.name.value =>
+            {
+                self.merge_object_type_definition(base, extension);
+                true
+            }
+            (TypeDefinition::Interface(base), TypeDefinition::Interface(extension))
+                if base.name.value == extension.name.value =>
+            {
+                self.merge_interface_type_definition(base, extension);
+                true
+            }
+            (TypeDefinition::Union(base), TypeDefinition::Union(extension))
+                if base.name.value == extension.name.value =>
+            {
+                self.merge_union_members(&mut base.members, extension.members);
+                base.directives.extend(extension.directives);
+                base.span = Span::new(base.span.start, extension.span.end);
+                true
+            }
+            (TypeDefinition::Enum(base), TypeDefinition::Enum(extension))
+                if base.name.value == extension.name.value =>
+            {
+                for value in extension.values {
+                    if base
+                        .values
+                        .iter()
+                        .all(|existing| existing.name.value != value.name.value)
+                    {
+                        base.values.push(value);
+                    }
+                }
+                base.directives.extend(extension.directives);
+                base.span = Span::new(base.span.start, extension.span.end);
+                true
+            }
+            (TypeDefinition::Input(base), TypeDefinition::Input(extension))
+                if base.name.value == extension.name.value =>
+            {
+                self.merge_input_object_type_definition(base, extension);
+                true
+            }
+            (TypeDefinition::InputUnion(base), TypeDefinition::InputUnion(extension))
+                if base.name.value == extension.name.value =>
+            {
+                self.merge_union_members(&mut base.members, extension.members);
+                base.directives.extend(extension.directives);
+                base.span = Span::new(base.span.start, extension.span.end);
+                true
+            }
+            (TypeDefinition::InputEnum(base), TypeDefinition::InputEnum(extension))
+                if base.name.value == extension.name.value =>
+            {
+                for variant in extension.variants {
+                    if base
+                        .variants
+                        .iter()
+                        .all(|existing| existing.name.value != variant.name.value)
+                    {
+                        base.variants.push(variant);
+                    }
+                }
+                base.directives.extend(extension.directives);
+                base.span = Span::new(base.span.start, extension.span.end);
+                true
+            }
+            (TypeDefinition::Scalar(base), TypeDefinition::Scalar(extension))
+                if base.name.value == extension.name.value =>
+            {
+                base.directives.extend(extension.directives);
+                base.span = Span::new(base.span.start, extension.span.end);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn merge_object_type_definition(
+        &mut self,
+        base: &mut ObjectTypeDefinition<'a>,
+        extension: ObjectTypeDefinition<'a>,
+    ) {
+        self.merge_type_params(&mut base.type_params, extension.type_params);
+        self.merge_implements(&mut base.implements, extension.implements);
+        self.merge_fields(&mut base.fields, extension.fields);
+        base.directives.extend(extension.directives);
+        if extension.visibility == Visibility::Public {
+            base.visibility = Visibility::Public;
+        }
+        base.span = Span::new(base.span.start, extension.span.end);
+    }
+
+    fn merge_interface_type_definition(
+        &mut self,
+        base: &mut InterfaceTypeDefinition<'a>,
+        extension: InterfaceTypeDefinition<'a>,
+    ) {
+        self.merge_type_params(&mut base.type_params, extension.type_params);
+        self.merge_implements(&mut base.implements, extension.implements);
+        self.merge_fields(&mut base.fields, extension.fields);
+        base.directives.extend(extension.directives);
+        if extension.visibility == Visibility::Public {
+            base.visibility = Visibility::Public;
+        }
+        base.span = Span::new(base.span.start, extension.span.end);
+    }
+
+    fn merge_input_object_type_definition(
+        &mut self,
+        base: &mut InputObjectTypeDefinition<'a>,
+        extension: InputObjectTypeDefinition<'a>,
+    ) {
+        self.merge_type_params(&mut base.type_params, extension.type_params);
+        self.merge_input_fields(&mut base.fields, extension.fields);
+        base.directives.extend(extension.directives);
+        if extension.visibility == Visibility::Public {
+            base.visibility = Visibility::Public;
+        }
+        base.span = Span::new(base.span.start, extension.span.end);
+    }
+
+    fn merge_type_params(
+        &mut self,
+        base: &mut Vec<TypeParameter<'a>>,
+        extension: Vec<TypeParameter<'a>>,
+    ) {
+        for param in extension {
+            if base
+                .iter()
+                .all(|existing| existing.name.value != param.name.value)
+            {
+                base.push(param);
+            }
+        }
+    }
+
+    fn merge_implements(&mut self, base: &mut Vec<Name>, extension: Vec<Name>) {
+        for name in extension {
+            if base.iter().all(|existing| existing.value != name.value) {
+                base.push(name);
+            }
+        }
+    }
+
+    fn merge_union_members(&mut self, base: &mut Vec<Name>, extension: Vec<Name>) {
+        for name in extension {
+            if base.iter().all(|existing| existing.value != name.value) {
+                base.push(name);
+            }
+        }
+    }
+
+    fn merge_fields(
+        &mut self,
+        base: &mut Vec<FieldDefinition<'a>>,
+        extension: Vec<FieldDefinition<'a>>,
+    ) {
+        for field in extension {
+            if base
+                .iter()
+                .all(|existing| existing.name.value != field.name.value)
+            {
+                base.push(field);
+            }
+        }
+    }
+
+    fn merge_input_fields(
+        &mut self,
+        base: &mut Vec<InputValueDefinition<'a>>,
+        extension: Vec<InputValueDefinition<'a>>,
+    ) {
+        for field in extension {
+            if base
+                .iter()
+                .all(|existing| existing.name.value != field.name.value)
+            {
+                base.push(field);
             }
         }
     }
@@ -219,8 +578,12 @@ impl<'a> Parser<'a> {
             self.advance();
             let mut definitions = Vec::new();
             while !self.at_kind(TokenKind::RBrace) && !self.at_kind(TokenKind::Eof) {
+                self.skip_commas();
+                if self.at_kind(TokenKind::RBrace) {
+                    break;
+                }
                 if let Some(def) = self.parse_definition() {
-                    definitions.push(def);
+                    self.push_parsed_definition(&mut definitions, def);
                 } else {
                     self.advance();
                 }
@@ -256,8 +619,10 @@ impl<'a> Parser<'a> {
         let start = self.current.span.start;
         self.advance(); // use
 
-        // Expect ::
-        self.expect(TokenKind::ColonColon);
+        // Support both `use::path` and Rust-like `use path`.
+        if self.at_kind(TokenKind::ColonColon) {
+            self.advance();
+        }
 
         // Parse module path
         let mut path = Vec::new();
@@ -419,6 +784,10 @@ impl<'a> Parser<'a> {
 
         let mut operations = Vec::new();
         while !self.at_kind(TokenKind::RBrace) && !self.at_kind(TokenKind::Eof) {
+            self.skip_commas();
+            if self.at_kind(TokenKind::RBrace) {
+                break;
+            }
             let op_start = self.current.span.start;
             let operation = match self.at() {
                 TokenKind::Query => {
@@ -465,6 +834,7 @@ impl<'a> Parser<'a> {
         &mut self,
         description: Option<Description<'a>>,
         visibility: Visibility,
+        allow_empty_body: bool,
     ) -> ObjectTypeDefinition<'a> {
         let start = self.current.span.start;
         self.advance(); // type
@@ -474,9 +844,17 @@ impl<'a> Parser<'a> {
         let implements = self.parse_implements();
         let directives = self.parse_directives();
 
-        self.expect(TokenKind::LBrace);
-        let fields = self.parse_field_definitions();
-        self.expect(TokenKind::RBrace);
+        let fields = if self.at_kind(TokenKind::LBrace) {
+            self.advance();
+            let fields = self.parse_field_definitions();
+            self.expect(TokenKind::RBrace);
+            fields
+        } else if allow_empty_body {
+            Vec::new()
+        } else {
+            self.error_expected(TokenKind::LBrace);
+            Vec::new()
+        };
 
         let end = self.current.span.start;
         ObjectTypeDefinition {
@@ -496,6 +874,7 @@ impl<'a> Parser<'a> {
         &mut self,
         description: Option<Description<'a>>,
         visibility: Visibility,
+        allow_empty_body: bool,
     ) -> InterfaceTypeDefinition<'a> {
         let start = self.current.span.start;
         self.advance(); // interface
@@ -505,9 +884,17 @@ impl<'a> Parser<'a> {
         let implements = self.parse_implements();
         let directives = self.parse_directives();
 
-        self.expect(TokenKind::LBrace);
-        let fields = self.parse_field_definitions();
-        self.expect(TokenKind::RBrace);
+        let fields = if self.at_kind(TokenKind::LBrace) {
+            self.advance();
+            let fields = self.parse_field_definitions();
+            self.expect(TokenKind::RBrace);
+            fields
+        } else if allow_empty_body {
+            Vec::new()
+        } else {
+            self.error_expected(TokenKind::LBrace);
+            Vec::new()
+        };
 
         let end = self.current.span.start;
         InterfaceTypeDefinition {
@@ -588,6 +975,10 @@ impl<'a> Parser<'a> {
     fn parse_enum_values(&mut self) -> Vec<EnumValueDefinition<'a>> {
         let mut values = Vec::new();
         while !self.at_kind(TokenKind::RBrace) && !self.at_kind(TokenKind::Eof) {
+            self.skip_commas();
+            if self.at_kind(TokenKind::RBrace) {
+                break;
+            }
             let description = self.try_parse_description();
             let value_start = self.current.span.start;
             let name = self.parse_name();
@@ -652,6 +1043,7 @@ impl<'a> Parser<'a> {
         self.advance(); // input
 
         let name = self.parse_name();
+        let type_params = self.parse_type_parameters();
         let directives = self.parse_directives();
 
         self.expect(TokenKind::LBrace);
@@ -663,6 +1055,7 @@ impl<'a> Parser<'a> {
             description,
             visibility,
             name,
+            type_params,
             directives,
             fields,
             span: Span::new(start, end),
@@ -805,6 +1198,10 @@ impl<'a> Parser<'a> {
     fn parse_input_enum_variants(&mut self) -> Vec<InputEnumVariant<'a>> {
         let mut variants = Vec::new();
         while !self.at_kind(TokenKind::RBrace) && !self.at_kind(TokenKind::Eof) {
+            self.skip_commas();
+            if self.at_kind(TokenKind::RBrace) {
+                break;
+            }
             let description = self.try_parse_description();
             let variant_start = self.current.span.start;
             let name = self.parse_name();
@@ -964,6 +1361,10 @@ impl<'a> Parser<'a> {
     fn parse_field_definitions(&mut self) -> Vec<FieldDefinition<'a>> {
         let mut fields = Vec::new();
         while !self.at_kind(TokenKind::RBrace) && !self.at_kind(TokenKind::Eof) {
+            self.skip_commas();
+            if self.at_kind(TokenKind::RBrace) {
+                break;
+            }
             let description = self.try_parse_description();
             fields.push(self.parse_field_definition(description));
         }
@@ -987,9 +1388,11 @@ impl<'a> Parser<'a> {
             Vec::new()
         };
 
+        let mut directives = self.parse_directives();
+
         self.expect(TokenKind::Colon);
         let ty = self.parse_type();
-        let directives = self.parse_directives();
+        directives.extend(self.parse_directives());
 
         let end = self.current.span.start;
         FieldDefinition {
@@ -1077,7 +1480,8 @@ impl<'a> Parser<'a> {
 
         // Check for tuple type
         if self.at_kind(TokenKind::LParen) {
-            return self.parse_tuple_type();
+            let tuple_type = self.parse_tuple_type();
+            return self.parse_type_suffix(tuple_type);
         }
 
         // Named or generic type
@@ -1097,17 +1501,42 @@ impl<'a> Parser<'a> {
             }
             self.expect(TokenKind::RAngle);
             let end = self.current.span.start;
-            Type::Generic(GenericType {
+            self.parse_type_suffix(Type::Generic(GenericType {
                 name,
                 arguments,
                 span: Span::new(start, end),
-            })
+            }))
         } else {
             let end = self.current.span.start;
-            Type::Named(NamedType {
+            self.parse_type_suffix(Type::Named(NamedType {
                 name,
                 span: Span::new(start, end),
-            })
+            }))
+        }
+    }
+
+    fn parse_type_suffix(&mut self, mut ty: Type<'a>) -> Type<'a> {
+        loop {
+            if self.at_kind(TokenKind::Bang) {
+                self.advance();
+                continue;
+            }
+
+            if self.at_kind(TokenKind::Question) {
+                let start = match &ty {
+                    Type::Named(named) => named.span.start,
+                    Type::Option(_, span) | Type::List(_, span) => span.start,
+                    Type::Generic(generic) => generic.span.start,
+                    Type::Tuple(tuple) => tuple.span.start,
+                    Type::_Phantom(_) => self.current.span.start,
+                };
+                self.advance();
+                let end = self.current.span.start;
+                ty = Type::Option(Box::new(ty), Span::new(start, end));
+                continue;
+            }
+
+            return ty;
         }
     }
 
@@ -1182,7 +1611,7 @@ impl<'a> Parser<'a> {
         let name = self.parse_name();
         let arguments = if self.at_kind(TokenKind::LParen) {
             self.advance();
-            let args = self.parse_arguments();
+            let args = self.parse_directive_arguments(name);
             self.expect(TokenKind::RParen);
             args
         } else {
@@ -1197,13 +1626,82 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn parse_directive_arguments(&mut self, directive_name: Name) -> Vec<Argument<'a>> {
+        let mut args = Vec::new();
+        while !self.at_kind(TokenKind::RParen) && !self.at_kind(TokenKind::Eof) {
+            self.skip_commas();
+            if self.at_kind(TokenKind::RParen) {
+                break;
+            }
+            args.push(self.parse_directive_argument(directive_name, args.len()));
+        }
+        args
+    }
+
     /// Parses arguments.
     fn parse_arguments(&mut self) -> Vec<Argument<'a>> {
         let mut args = Vec::new();
         while !self.at_kind(TokenKind::RParen) && !self.at_kind(TokenKind::Eof) {
+            self.skip_commas();
+            if self.at_kind(TokenKind::RParen) {
+                break;
+            }
             args.push(self.parse_argument());
         }
         args
+    }
+
+    fn parse_directive_argument(&mut self, directive_name: Name, index: usize) -> Argument<'a> {
+        let argument_span = self.current.span;
+        let start = argument_span.start;
+
+        let is_named = (self.at_kind(TokenKind::Ident) || self.at().is_keyword())
+            && self.peek_next() == TokenKind::Colon;
+
+        let (name, value) = if is_named {
+            let name = self.parse_name();
+            self.expect(TokenKind::Colon);
+            let value = self.parse_value();
+            (name, value)
+        } else {
+            let implicit_name =
+                self.implicit_directive_argument_name(directive_name.value, index, argument_span);
+            let value = self.parse_value();
+            (implicit_name, value)
+        };
+
+        let end = self.current.span.start;
+        Argument {
+            name,
+            value,
+            span: Span::new(start, end),
+        }
+    }
+
+    fn implicit_directive_argument_name(
+        &self,
+        directive_name: Text,
+        index: usize,
+        span: Span,
+    ) -> Name {
+        let directive_name = self.interner.get(directive_name);
+        let implicit_name = match (directive_name.as_str(), index) {
+            ("pattern", 0) => "regex",
+            ("pattern", 1) => "flags",
+            ("range", 0) | ("length", 0) => "min",
+            ("range", 1) | ("length", 1) => "max",
+            ("deprecated", 0) => "reason",
+            ("timezone", 0) => "tz",
+            ("patch", 0) | ("put", 0) => "type",
+            ("sorted", 0) => "order",
+            ("version", 0) => "value",
+            ("rateLimit", 0) => "requests",
+            ("rateLimit", 1) => "window",
+            ("cache", 0) => "maxAge",
+            ("cache", 1) => "scope",
+            _ => "value",
+        };
+        Name::new(self.interner.intern(implicit_name), span)
     }
 
     /// Parses an argument.
@@ -1268,6 +1766,10 @@ impl<'a> Parser<'a> {
                 self.advance();
                 let mut values = Vec::new();
                 while !self.at_kind(TokenKind::RBracket) && !self.at_kind(TokenKind::Eof) {
+                    self.skip_commas();
+                    if self.at_kind(TokenKind::RBracket) {
+                        break;
+                    }
                     values.push(self.parse_value());
                 }
                 self.expect(TokenKind::RBracket);
@@ -1277,6 +1779,10 @@ impl<'a> Parser<'a> {
                 self.advance();
                 let mut fields = Vec::new();
                 while !self.at_kind(TokenKind::RBrace) && !self.at_kind(TokenKind::Eof) {
+                    self.skip_commas();
+                    if self.at_kind(TokenKind::RBrace) {
+                        break;
+                    }
                     let name = self.parse_name();
                     self.expect(TokenKind::Colon);
                     let value = self.parse_value();
@@ -1349,6 +1855,10 @@ impl<'a> Parser<'a> {
     fn parse_variable_definitions(&mut self) -> Vec<VariableDefinition<'a>> {
         let mut vars = Vec::new();
         while !self.at_kind(TokenKind::RParen) && !self.at_kind(TokenKind::Eof) {
+            self.skip_commas();
+            if self.at_kind(TokenKind::RParen) {
+                break;
+            }
             vars.push(self.parse_variable_definition());
         }
         vars
@@ -1409,6 +1919,10 @@ impl<'a> Parser<'a> {
 
         let mut selections = Vec::new();
         while !self.at_kind(TokenKind::RBrace) && !self.at_kind(TokenKind::Eof) {
+            self.skip_commas();
+            if self.at_kind(TokenKind::RBrace) {
+                break;
+            }
             selections.push(self.parse_selection());
         }
         self.expect(TokenKind::RBrace);
@@ -1423,6 +1937,7 @@ impl<'a> Parser<'a> {
     /// Parses a selection.
     fn parse_selection(&mut self) -> Selection<'a> {
         if self.at_kind(TokenKind::Spread) {
+            let start = self.current.span.start;
             self.advance();
             if self.at_kind(TokenKind::On) {
                 // Inline fragment
@@ -1439,19 +1954,40 @@ impl<'a> Parser<'a> {
             } else if self.at_kind(TokenKind::LBrace) || self.at_kind(TokenKind::At) {
                 // Inline fragment without type condition
                 let directives = self.parse_directives();
-                let selection_set = self.parse_selection_set();
-                Selection::InlineFragment(InlineFragment {
-                    type_condition: None,
-                    directives,
-                    selection_set,
-                    span: self.current.span,
-                })
+                if self.at_kind(TokenKind::LBrace) {
+                    let selection_set = self.parse_selection_set();
+                    Selection::InlineFragment(InlineFragment {
+                        type_condition: None,
+                        directives,
+                        selection_set,
+                        span: self.current.span,
+                    })
+                } else if directives.len() == 1 && directives[0].arguments.is_empty() {
+                    Selection::FragmentSpread(FragmentSpread {
+                        name: directives[0].name,
+                        shorthand: true,
+                        directives: Vec::new(),
+                        span: Span::new(start, self.current.span.start),
+                    })
+                } else {
+                    self.error("expected selection set after inline fragment directives");
+                    Selection::InlineFragment(InlineFragment {
+                        type_condition: None,
+                        directives,
+                        selection_set: SelectionSet {
+                            selections: Vec::new(),
+                            span: Span::new(start, self.current.span.start),
+                        },
+                        span: Span::new(start, self.current.span.start),
+                    })
+                }
             } else {
                 // Fragment spread
                 let name = self.parse_name();
                 let directives = self.parse_directives();
                 Selection::FragmentSpread(FragmentSpread {
                     name,
+                    shorthand: false,
                     directives,
                     span: self.current.span,
                 })
@@ -1646,6 +2182,218 @@ mod tests {
                 _ => panic!("expected named items with alias"),
             },
             _ => panic!("expected use statement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_commas_in_operation_arguments_and_values() {
+        let interner = Interner::new();
+        let result = parse(
+            r#"
+            query GetUser($id: ID = 1, $tags: List<String> = ["a", "b"]) {
+                user(id: $id, options: { active: true, tags: ["x", "y"] }) {
+                    id,
+                    name,
+                    ...UserFields,
+                    ... on Admin {
+                        role,
+                    }
+                }
+            }
+
+            fragment UserFields on User {
+                email,
+                avatarUrl,
+            }
+            "#,
+            &interner,
+        );
+        assert!(!result.diagnostics.has_errors());
+        assert_eq!(result.document.definitions.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_rust_style_use_statement() {
+        let interner = Interner::new();
+        let result = parse("pub use super::types::{User, UserRole}", &interner);
+        assert!(!result.diagnostics.has_errors());
+        match &result.document.definitions[0] {
+            Definition::Use(u) => {
+                assert_eq!(u.visibility, Visibility::Public);
+                assert_eq!(interner.get(u.path[0].value), "super");
+                assert_eq!(interner.get(u.path[1].value), "types");
+            }
+            _ => panic!("expected use statement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_directive_positional_argument_shorthand() {
+        let interner = Interner::new();
+        let result = parse(
+            r#"type Query { user(id: ID @min(1) @pattern("^[a-z]+$")): User }"#,
+            &interner,
+        );
+        assert!(!result.diagnostics.has_errors());
+
+        match &result.document.definitions[0] {
+            Definition::Type(TypeDefinition::Object(obj)) => {
+                let arg = &obj.fields[0].arguments[0];
+                assert_eq!(arg.directives.len(), 2);
+                assert_eq!(
+                    interner.get(arg.directives[0].arguments[0].name.value),
+                    "value"
+                );
+                assert_eq!(
+                    interner.get(arg.directives[1].arguments[0].name.value),
+                    "regex"
+                );
+            }
+            _ => panic!("expected object type definition"),
+        }
+    }
+
+    #[test]
+    fn test_parse_type_alias_keyword_form() {
+        let interner = Interner::new();
+        let result = parse("type alias UserConnection = Connection<User>", &interner);
+        assert!(!result.diagnostics.has_errors());
+        match &result.document.definitions[0] {
+            Definition::Type(TypeDefinition::TypeAlias(alias)) => {
+                assert_eq!(interner.get(alias.name.value), "UserConnection");
+            }
+            _ => panic!("expected type alias"),
+        }
+    }
+
+    #[test]
+    fn test_parse_generic_input_type() {
+        let interner = Interner::new();
+        let result = parse(
+            r#"
+            pub input SortField<Field extends String> {
+                field: Field
+                direction: SortDirection = Asc
+            }
+            "#,
+            &interner,
+        );
+        assert!(!result.diagnostics.has_errors());
+        match &result.document.definitions[0] {
+            Definition::Type(TypeDefinition::Input(input)) => {
+                assert_eq!(input.visibility, Visibility::Public);
+                assert_eq!(input.type_params.len(), 1);
+                assert_eq!(interner.get(input.type_params[0].name.value), "Field");
+                match input.type_params[0].constraint.as_ref() {
+                    Some(Type::Named(named)) => {
+                        assert_eq!(interner.get(named.name), "String");
+                    }
+                    _ => panic!("expected named constraint"),
+                }
+                assert_eq!(interner.get(input.fields[0].name.value), "field");
+            }
+            _ => panic!("expected input type definition"),
+        }
+    }
+
+    #[test]
+    fn test_parse_non_null_type_suffix() {
+        let interner = Interner::new();
+        let result = parse(
+            "query GetUser($id: UserId!, $name: String?) { me { id } }",
+            &interner,
+        );
+        assert!(!result.diagnostics.has_errors());
+        match &result.document.definitions[0] {
+            Definition::Operation(operation) => {
+                assert_eq!(operation.variables.len(), 2);
+            }
+            _ => panic!("expected operation"),
+        }
+    }
+
+    #[test]
+    fn test_parse_server_fragment_shorthand() {
+        let interner = Interner::new();
+        let result = parse(
+            r#"
+            query GetUser {
+                me {
+                    ...@UserDetail
+                }
+            }
+            "#,
+            &interner,
+        );
+        assert!(!result.diagnostics.has_errors());
+        match &result.document.definitions[0] {
+            Definition::Operation(operation) => match &operation.selection_set.selections[0] {
+                Selection::Field(field) => {
+                    match &field.selection_set.as_ref().unwrap().selections[0] {
+                        Selection::FragmentSpread(spread) => {
+                            assert!(spread.shorthand);
+                            assert_eq!(interner.get(spread.name.value), "UserDetail");
+                        }
+                        _ => panic!("expected fragment spread"),
+                    }
+                }
+                _ => panic!("expected field selection"),
+            },
+            _ => panic!("expected operation"),
+        }
+    }
+
+    #[test]
+    fn test_parse_extend_type_merges_definition() {
+        let interner = Interner::new();
+        let result = parse(
+            r#"
+            type User {
+                id: ID
+            }
+
+            extend type User implements Node {
+                email: String
+            }
+            "#,
+            &interner,
+        );
+        assert!(!result.diagnostics.has_errors());
+        assert_eq!(result.document.definitions.len(), 1);
+
+        match &result.document.definitions[0] {
+            Definition::Type(TypeDefinition::Object(obj)) => {
+                assert_eq!(obj.fields.len(), 2);
+                assert_eq!(obj.implements.len(), 1);
+                assert_eq!(interner.get(obj.implements[0].value), "Node");
+            }
+            _ => panic!("expected object type definition"),
+        }
+    }
+
+    #[test]
+    fn test_parse_extend_schema_merges_operations() {
+        let interner = Interner::new();
+        let result = parse(
+            r#"
+            schema {
+                query: Query
+            }
+
+            extend schema {
+                subscription: Subscription
+            }
+            "#,
+            &interner,
+        );
+        assert!(!result.diagnostics.has_errors());
+        assert_eq!(result.document.definitions.len(), 1);
+
+        match &result.document.definitions[0] {
+            Definition::Schema(schema) => {
+                assert_eq!(schema.operations.len(), 2);
+            }
+            _ => panic!("expected schema definition"),
         }
     }
 }
